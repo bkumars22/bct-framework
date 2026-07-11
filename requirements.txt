@@ -1,3 +1,9 @@
 scipy>=1.13.0
 numpy>=1.26.0
 matplotlib>=3.8.0
+
+# Real verification (default mode) — at least one of these SDKs plus a
+# matching API key (GROQ_API_KEY / ANTHROPIC_API_KEY) is required unless
+# you explicitly pass use_simulation=True.
+groq>=0.9.0
+anthropic>=0.30.0

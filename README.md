@@ -26,10 +26,25 @@ This is the watermelon effect — measured.
 
 ```bash
 pip install bct-framework  # coming soon
-# For now: clone this repo
+# For now: clone this repo, then:
+pip install -r requirements.txt
 ```
 
-## Usage
+## Real verification (default)
+
+Verification calls a real LLM by default — one call to get the response
+under test (using a system prompt built from the contract's own rules,
+`contract.to_system_prompt()`), and a second call asking the same kind of
+model to judge, as an impartial auditor, whether that response actually
+complied with every rule. This is what lets BCT test an *arbitrary*
+contract's rule text, not just a hardcoded demo topic.
+
+Set one of these before running:
+
+```bash
+export GROQ_API_KEY=...        # or
+export ANTHROPIC_API_KEY=...
+```
 
 ```python
 from bct import BehavioralContract
@@ -44,8 +59,20 @@ contract = BehavioralContract(
 )
 
 verifier = BehavioralContractVerifier()
-report = verifier.verify(contract)
+report = verifier.verify(contract)  # real by default — raises clearly if no key is set
 report.print_report()
+```
+
+## Demo / simulated mode
+
+No API key? Pass `use_simulation=True` explicitly (or just run `demo.py` —
+it auto-falls-back with a printed warning when no key is configured). This
+samples from a hand-tuned probability table shaped to reproduce the
+"watermelon effect" narrative below — it is **not** a real model response,
+and every report generated this way is labeled `[SIMULATED]`.
+
+```python
+report = verifier.verify(contract, use_simulation=True)
 ```
 
 ## Output

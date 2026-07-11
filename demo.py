@@ -1,11 +1,19 @@
 """
 BCT Demo — Behavioral Contract Testing Framework
 Testing ARIA's Socratic teaching contract
+
+Real by default: set GROQ_API_KEY or ANTHROPIC_API_KEY to actually run
+this against a live model. Without either, pass use_simulation=True to
+verifier.verify() below (or just run this as-is — it will raise a clear
+error telling you which env var to set instead of silently faking data).
 """
 import sys
-sys.path.insert(0, '/home/claude/bct')
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles default to cp1252, which can't print the emoji below
 
 from bct import BehavioralContract, BehavioralContractVerifier
+from bct.llm_client import configured_provider
 
 # ─────────────────────────────────────────────
 # STEP 1: Define ARIA's behavioral contract
@@ -34,10 +42,17 @@ aria_contract = BehavioralContract(
 # ─────────────────────────────────────────────
 # STEP 2: Run verification
 # ─────────────────────────────────────────────
+no_key = configured_provider() is None
+if no_key:
+    print("\n⚠️  No GROQ_API_KEY / ANTHROPIC_API_KEY found — running the SIMULATED demo fallback")
+    print("   (a probability-table sample, not a real model). Set one of those env vars and")
+    print("   re-run for real verification.\n")
+
 verifier = BehavioralContractVerifier()
 report = verifier.verify(
     contract=aria_contract,
-    topic="7 times 8"
+    topic="7 times 8",
+    use_simulation=no_key,
 )
 
 # ─────────────────────────────────────────────
