@@ -23,8 +23,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from bct import (
-    AgentNode, BehavioralContract, BehavioralContractVerifier, ContractGapAnalyzer,
-    DriftTracker, MultiAgentVerifier,
+    AgentNode, BehavioralContract, BehavioralContractVerifier, ContractExample, ContractGapAnalyzer,
+    ContractSynthesizer, DriftTracker, MultiAgentVerifier,
 )
 from bct.llm_client import SUPPORTED_PROVIDERS, configured_provider
 
@@ -70,6 +70,20 @@ class PipelineRequest(BaseModel):
     agents: List[AgentRequest]
     cases_per_link: int = 10
     topic: Optional[str] = None
+
+
+class ExampleRequest(BaseModel):
+    input_text: str
+    response_text: str
+    label: str  # "compliant" | "violation"
+    note: str = ""
+
+
+class SynthesizeRequest(BaseModel):
+    name: str
+    examples: List[ExampleRequest]
+    threshold: float = 0.90
+    provider: Optional[str] = None
 
 
 def _safe_float(value: float) -> Optional[float]:
@@ -174,6 +188,36 @@ async def drift(contract_name: str, min_runs: int = 5):
         "findings": [
             {"run_index": f.run_index, "timestamp": f.timestamp, "message": f.message}
             for f in report.findings
+        ],
+    }
+
+
+@app.post("/synthesize-contract")
+async def synthesize_contract(req: SynthesizeRequest):
+    examples = [
+        ContractExample(input_text=e.input_text, response_text=e.response_text, label=e.label, note=e.note)
+        for e in req.examples
+    ]
+    synthesizer = ContractSynthesizer()
+    try:
+        result = await synthesizer.synthesize(req.name, examples, provider=req.provider, threshold=req.threshold)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(400, str(exc))
+
+    return {
+        "contract": {
+            "name": result.contract.name,
+            "system": result.contract.system,
+            "always": result.contract.always,
+            "never": result.contract.never,
+            "under_pressure": result.contract.under_pressure,
+            "threshold": result.contract.threshold,
+        },
+        "training_accuracy": result.training_accuracy,
+        "total_examples": result.total_examples,
+        "misclassified_examples": [
+            {"input_text": e.input_text, "response_text": e.response_text, "label": e.label, "note": e.note}
+            for e in result.misclassified_examples
         ],
     }
 

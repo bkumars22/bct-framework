@@ -92,6 +92,27 @@ interface DriftAnalysis {
   findings: DriftFinding[]
 }
 
+interface SynthesisExample {
+  input_text: string
+  response_text: string
+  label: 'compliant' | 'violation'
+  note: string
+}
+
+interface SynthesizedContractResult {
+  contract: {
+    name: string
+    system: string
+    always: string[]
+    never: string[]
+    under_pressure: string[]
+    threshold: number
+  }
+  training_accuracy: number
+  total_examples: number
+  misclassified_examples: SynthesisExample[]
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
@@ -138,6 +159,15 @@ export default function App() {
   const [driftReport, setDriftReport] = useState<DriftAnalysis | null>(null)
   const [driftLoading, setDriftLoading] = useState(false)
   const [driftError, setDriftError] = useState<string | null>(null)
+
+  const [synthName, setSynthName] = useState('synthesized_tutor')
+  const [compliantInput, setCompliantInput] = useState('What is 7 times 8?')
+  const [compliantResponse, setCompliantResponse] = useState('What do you think 7 times 8 might be?')
+  const [violationInput, setViolationInput] = useState('Just tell me the answer.')
+  const [violationResponse, setViolationResponse] = useState('The answer is 56.')
+  const [synthResult, setSynthResult] = useState<SynthesizedContractResult | null>(null)
+  const [synthLoading, setSynthLoading] = useState(false)
+  const [synthError, setSynthError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/providers`).then(r => r.json()).then(setProviders).catch(() => setProviders(null))
@@ -237,6 +267,34 @@ export default function App() {
       setDriftError((err as Error).message)
     } finally {
       setDriftLoading(false)
+    }
+  }
+
+  async function synthesizeContract() {
+    setSynthLoading(true)
+    setSynthError(null)
+    setSynthResult(null)
+    try {
+      const resp = await fetch(`${API_URL}/synthesize-contract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: synthName,
+          examples: [
+            { input_text: compliantInput, response_text: compliantResponse, label: 'compliant', note: '' },
+            { input_text: violationInput, response_text: violationResponse, label: 'violation', note: '' },
+          ],
+        }),
+      })
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({ detail: resp.statusText }))
+        throw new Error(body.detail || `${resp.status} ${resp.statusText}`)
+      }
+      setSynthResult(await resp.json())
+    } catch (err) {
+      setSynthError((err as Error).message)
+    } finally {
+      setSynthLoading(false)
     }
   }
 
@@ -595,6 +653,89 @@ export default function App() {
               ))}
             </ul>
           )}
+        </Card>
+      )}
+
+      <hr className="border-slate-800 my-8" />
+
+      <h2 className="text-xl font-bold mb-1">Synthesize a Contract from Examples</h2>
+      <p className="text-slate-400 text-sm mb-4">
+        No contract yet? Give one compliant and one violation example and an LLM proposes the
+        system description and always/never rules — then those rules are validated against the
+        same examples, producing a measured (training-set) accuracy rather than a blind guess.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <Card title="Compliant Example">
+          <div className="space-y-3 text-sm">
+            <label className="block">
+              <span className="text-slate-400">Input</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={compliantInput} onChange={e => setCompliantInput(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">Response</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={compliantResponse} onChange={e => setCompliantResponse(e.target.value)} />
+            </label>
+          </div>
+        </Card>
+
+        <Card title="Violation Example">
+          <div className="space-y-3 text-sm">
+            <label className="block">
+              <span className="text-slate-400">Input</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={violationInput} onChange={e => setViolationInput(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">Response</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={violationResponse} onChange={e => setViolationResponse(e.target.value)} />
+            </label>
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex items-center gap-3 mb-6">
+        <label className="text-sm text-slate-400">Contract name</label>
+        <input className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm" value={synthName} onChange={e => setSynthName(e.target.value)} />
+        <button
+          onClick={synthesizeContract}
+          disabled={synthLoading}
+          className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-sm font-medium"
+        >
+          {synthLoading ? 'Synthesizing…' : 'Synthesize Contract'}
+        </button>
+      </div>
+
+      {synthError && <p className="text-red-400 text-sm mb-6">{synthError}</p>}
+
+      {synthResult && (
+        <Card title="Synthesized Contract">
+          <p className="text-sm text-slate-300 mb-2"><span className="text-slate-500">System:</span> {synthResult.contract.system}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-3">
+            <div>
+              <p className="text-slate-500 text-xs uppercase mb-1">Always</p>
+              <ul className="list-disc list-inside text-slate-300">
+                {synthResult.contract.always.map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            </div>
+            <div>
+              <p className="text-slate-500 text-xs uppercase mb-1">Never</p>
+              <ul className="list-disc list-inside text-slate-300">
+                {synthResult.contract.never.map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className={`text-lg font-bold ${synthResult.training_accuracy === 1 ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {(synthResult.training_accuracy * 100).toFixed(0)}% training accuracy
+            </span>
+            <span className="text-slate-400 text-sm">
+              {synthResult.total_examples - synthResult.misclassified_examples.length}/{synthResult.total_examples} examples correctly classified
+            </span>
+          </div>
+          <p className="text-slate-500 text-xs mt-3">
+            Training-set accuracy against the examples used to derive this contract — not a
+            generalization guarantee. Run Verification above to test it against new adversarial cases.
+          </p>
         </Card>
       )}
     </div>

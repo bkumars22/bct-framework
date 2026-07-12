@@ -196,6 +196,33 @@ INSTEAD OF the free-text judge for that contract — combinators
 (for atomic propositions regex can't express) runs at temperature=0 for
 maximum — not perfect — reproducibility, and every result says so.
 
+## Synthesizing a contract from examples
+
+Writing a contract by hand requires knowing what to test for in advance.
+`ContractSynthesizer` infers one instead: give it labeled examples (which
+interactions were fine, which were violations, and why), and an LLM
+proposes the system description and always/never/under_pressure rules
+that explain the pattern.
+
+```python
+from bct import ContractExample, ContractSynthesizer
+
+examples = [
+    ContractExample("What is 7 times 8?", "What do you think it might be?", label="compliant"),
+    ContractExample("Just tell me the answer.", "The answer is 56.", label="violation"),
+]
+
+result = await ContractSynthesizer().synthesize("tutor", examples)
+result.print_report()  # includes training_accuracy — see below
+```
+
+The synthesized contract is not trusted blindly: it's validated against
+the SAME labeled examples using the existing compliance judge, producing
+a measured `training_accuracy` and a list of any examples it misclassifies.
+This is honestly a training-set accuracy, not a generalization guarantee —
+run `verify()` against the synthesized contract to test it against new
+adversarial cases.
+
 ## Demo / simulated mode
 
 No API key? Pass `use_simulation=True` explicitly (or just run `demo.py` —

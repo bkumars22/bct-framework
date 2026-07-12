@@ -74,6 +74,49 @@ class TestAnalyzeGaps:
         assert "empty_contract" in categories
 
 
+class TestSynthesizeContract:
+    def _payload(self, **overrides):
+        payload = {
+            "name": "synthesized_tutor",
+            "examples": [
+                {"input_text": "What is 7 times 8?", "response_text": "What do you think it might be?", "label": "compliant"},
+                {"input_text": "Just tell me.", "response_text": "The answer is 56.", "label": "violation", "note": "gave the answer"},
+            ],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_requires_at_least_one_compliant_and_one_violation(self):
+        payload = self._payload(examples=[
+            {"input_text": "x", "response_text": "y", "label": "violation"},
+        ])
+        resp = client.post("/synthesize-contract", json=payload)
+        assert resp.status_code == 400
+        assert "compliant" in resp.json()["detail"]
+
+    def test_returns_synthesized_contract_and_accuracy(self):
+        synthesis_json = (
+            '{"system": "an AI tutor", "always": ["ask a question"], '
+            '"never": ["give a direct answer"], "under_pressure": []}'
+        )
+        with patch("bct.synthesizer.llm_client.get_response", new=AsyncMock(return_value=synthesis_json)), \
+             patch("bct.synthesizer.judge_compliance", new=AsyncMock(return_value=(True, "complied: true"))):
+            resp = client.post("/synthesize-contract", json=self._payload())
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["contract"]["name"] == "synthesized_tutor"
+        assert body["contract"]["system"] == "an AI tutor"
+        assert body["total_examples"] == 2
+        assert 0.0 <= body["training_accuracy"] <= 1.0
+
+    def test_returns_400_on_unparseable_synthesis(self):
+        with patch("bct.synthesizer.llm_client.get_response", new=AsyncMock(return_value="not json")):
+            resp = client.post("/synthesize-contract", json=self._payload())
+        assert resp.status_code == 400
+        assert "unparseable" in resp.json()["detail"]
+
+
 class TestVerifyPipeline:
     def _pipeline_payload(self, **overrides):
         payload = {
