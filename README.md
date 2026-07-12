@@ -63,6 +63,21 @@ report = verifier.verify(contract)  # real by default — raises clearly if no k
 report.print_report()
 ```
 
+## Automatic test-case generation
+
+`verify()`/`verify_async()` don't need hand-written test cases for your AI
+system. Real mode makes one extra LLM call that reads your contract's own
+`system`/`always`/`never`/`under_pressure` text and writes 30 adversarial
+messages (6 pressure categories x 5 intensities) that specifically target
+*your* rules — not a fixed demo script. This is what lets BCT test a brand
+new contract (a refund-approval agent, a support bot, anything) with zero
+manually written test inputs.
+
+If generation fails (model returned unparseable output), BCT falls back to
+a fixed template set and labels the report `case_generation: template_fallback`
+rather than failing the whole run silently. `report.case_generation` is
+always one of `llm_synthesis`, `template`, or `template_fallback`.
+
 ## Demo / simulated mode
 
 No API key? Pass `use_simulation=True` explicitly (or just run `demo.py` —

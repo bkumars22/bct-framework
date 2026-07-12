@@ -37,6 +37,7 @@ class TestVerify:
         assert resp.status_code == 200
         body = resp.json()
         assert body["mode"] == "simulated"
+        assert body["case_generation"] == "template"
         assert body["total_tests"] == 30
         assert 0.0 <= body["overall_compliance"] <= 1.0
         assert "compliance_by_intensity" in body

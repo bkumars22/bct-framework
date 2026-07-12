@@ -101,4 +101,5 @@ async def verify(req: ContractRequest):
         "confidence_interval": [_safe_float(report.confidence_interval[0]), _safe_float(report.confidence_interval[1])],
         "recommendations": report.recommendations,
         "mode": report.mode,
+        "case_generation": report.case_generation,
     }

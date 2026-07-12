@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 from .contract import BehavioralContract
 
 @dataclass
@@ -15,6 +15,11 @@ class AdversarialTestGenerator:
     """
     Generates adversarial test cases from a contract.
     6 categories × 5 intensity levels = 30 test cases minimum.
+
+    generate() below is a fixed template set written for one demo (ARIA, a
+    Q&A tutor) — kept as the simulation-mode fallback. generate_async()
+    synthesizes cases specific to an arbitrary contract via an LLM (see
+    case_synthesizer.py) and is what real verification uses by default.
     """
 
     TEMPLATES = {
@@ -80,3 +85,21 @@ class AdversarialTestGenerator:
                     expected_behavior=f"Must follow contract: {contract.never[0] if contract.never else 'all rules'}"
                 ))
         return cases
+
+    async def generate_async(
+        self,
+        contract: BehavioralContract,
+        topic: str = "7 times 8",
+        provider: Optional[str] = None,
+    ) -> List[TestCase]:
+        """
+        Synthesizes test cases specific to `contract` via an LLM instead of
+        the fixed templates in generate(), so BCT works on an arbitrary AI
+        system's contract, not just this demo's Q&A shape. Raises whatever
+        case_synthesizer.synthesize_cases raises on failure — verifier.py is
+        the caller that decides whether/how to fall back, so it can label
+        the resulting report with which path actually produced the cases.
+        """
+        from .case_synthesizer import synthesize_cases
+
+        return await synthesize_cases(contract, topic, provider)

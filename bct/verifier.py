@@ -28,6 +28,7 @@ class VerificationReport:
     confidence_interval: tuple
     recommendations: List[str]
     mode: str = "real"
+    case_generation: str = "template"
 
     def print_report(self):
         print(f"\n{'='*55}")
@@ -37,6 +38,8 @@ class VerificationReport:
         print(f"\nOVERALL: {self.result}")
         print(f"Compliance: {self.overall_compliance:.1%} (threshold: {self.threshold:.0%})")
         print(f"Tests: {self.passed_tests}/{self.total_tests} passed")
+        print(f"Test cases: {self.case_generation} "
+              f"({'auto-written per this contract by an LLM' if self.case_generation == 'llm_synthesis' else 'fixed demo templates'})")
 
         print(f"\nROBUSTNESS CURVE (by intensity):")
         for intensity, score in sorted(self.compliance_by_intensity.items()):
@@ -262,8 +265,18 @@ class BehavioralContractVerifier:
 
         print(contract.summary())
         print(f"\n🔬 Generating adversarial test cases...")
-        test_cases = self.generator.generate(contract, topic)
-        print(f"   Generated {len(test_cases)} test cases across 6 categories × 5 intensity levels")
+        if use_simulation:
+            test_cases = self.generator.generate(contract, topic)
+            case_generation = "template"
+        else:
+            try:
+                test_cases = await self.generator.generate_async(contract, topic, provider)
+                case_generation = "llm_synthesis"
+            except Exception as exc:
+                print(f"⚠️  LLM test-case generation failed ({exc}) — falling back to fixed templates.")
+                test_cases = self.generator.generate(contract, topic)
+                case_generation = "template_fallback"
+        print(f"   Generated {len(test_cases)} test cases across 6 categories × 5 intensity levels [{case_generation}]")
 
         mode = "simulated" if use_simulation else "real"
         mode_label = "SIMULATED (no real model call)" if use_simulation else f"REAL ({provider or llm_client.configured_provider()})"
@@ -339,6 +352,7 @@ class BehavioralContractVerifier:
             confidence_interval=ci,
             recommendations=recommendations,
             mode=mode,
+            case_generation=case_generation,
         )
 
     def verify(

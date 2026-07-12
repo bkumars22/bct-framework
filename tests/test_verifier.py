@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from bct.contract import BehavioralContract  # noqa: E402
+from bct.generator import AdversarialTestGenerator  # noqa: E402
 from bct.verifier import BehavioralContractVerifier  # noqa: E402
 
 
@@ -75,27 +76,55 @@ class TestVerify:
     @pytest.mark.asyncio
     async def test_real_mode_calls_llm_for_response_and_judge(self):
         verifier = BehavioralContractVerifier()
-        with patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get, \
+        contract = _contract()
+        template_cases = AdversarialTestGenerator().generate(contract)
+        with patch.object(verifier.generator, "generate_async", new=AsyncMock(return_value=template_cases)), \
+             patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get, \
              patch("bct.verifier.llm_client.configured_provider", return_value="groq"):
             # first call per case = the response under test, second = the judge verdict
             mock_get.side_effect = [
                 "What do you think 7 times 8 might be?", "complied: true\nviolated_rule: none\nevidence: asks a guiding question",
             ] * 30
-            report = await verifier.verify_async(_contract(), use_simulation=False, provider="groq")
+            report = await verifier.verify_async(contract, use_simulation=False, provider="groq")
 
         assert report.mode == "real"
         assert report.total_tests == 30
         assert report.overall_compliance == 1.0  # every judged response was compliant
+        assert report.case_generation == "llm_synthesis"
 
     @pytest.mark.asyncio
     async def test_real_mode_reports_violations_from_judge(self):
         verifier = BehavioralContractVerifier()
-        with patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get, \
+        contract = _contract()
+        template_cases = AdversarialTestGenerator().generate(contract)
+        with patch.object(verifier.generator, "generate_async", new=AsyncMock(return_value=template_cases)), \
+             patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get, \
              patch("bct.verifier.llm_client.configured_provider", return_value="groq"):
             mock_get.side_effect = [
                 "The answer is 56.", "complied: false\nviolated_rule: give the answer\nevidence: states the answer directly",
             ] * 30
-            report = await verifier.verify_async(_contract(), use_simulation=False, provider="groq")
+            report = await verifier.verify_async(contract, use_simulation=False, provider="groq")
 
         assert report.overall_compliance == 0.0
         assert report.result == "❌ FAILED"
+
+    @pytest.mark.asyncio
+    async def test_real_mode_falls_back_to_templates_when_case_synthesis_fails(self):
+        verifier = BehavioralContractVerifier()
+        contract = _contract()
+        with patch.object(verifier.generator, "generate_async", new=AsyncMock(side_effect=RuntimeError("bad json"))), \
+             patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get, \
+             patch("bct.verifier.llm_client.configured_provider", return_value="groq"):
+            mock_get.side_effect = [
+                "What do you think 7 times 8 might be?", "complied: true\nviolated_rule: none\nevidence: asks a guiding question",
+            ] * 30
+            report = await verifier.verify_async(contract, use_simulation=False, provider="groq")
+
+        assert report.case_generation == "template_fallback"
+        assert report.total_tests == 30
+
+    def test_simulation_mode_uses_templates_directly(self):
+        verifier = BehavioralContractVerifier()
+        with patch.dict(os.environ, {}, clear=True):
+            report = verifier.verify(_contract(), use_simulation=True, random_seed=1)
+        assert report.case_generation == "template"

@@ -19,6 +19,7 @@ interface VerificationReport {
   confidence_interval: [number | null, number | null]
   recommendations: string[]
   mode: 'real' | 'simulated'
+  case_generation: 'llm_synthesis' | 'template' | 'template_fallback'
 }
 
 interface ProvidersInfo {
@@ -187,6 +188,13 @@ export default function App() {
                 ⚠ This report used simulated responses (no LLM API key configured) — not a real model's behavior.
               </p>
             )}
+            <p className="text-slate-400 text-xs mt-2">
+              Test cases: {report.case_generation === 'llm_synthesis'
+                ? 'auto-written for this contract by an LLM — no manual test cases needed'
+                : report.case_generation === 'template_fallback'
+                  ? 'LLM case generation failed — fell back to fixed demo templates'
+                  : 'fixed demo templates'}
+            </p>
           </Card>
 
           <Card title="Robustness Curve — Compliance by Intensity">
