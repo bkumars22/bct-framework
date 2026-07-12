@@ -20,6 +20,16 @@ interface VerificationReport {
   recommendations: string[]
   mode: 'real' | 'simulated'
   case_generation: 'llm_synthesis' | 'template' | 'template_fallback'
+  statistical_proof: {
+    trials: number
+    violations: number
+    observed_violation_rate: number
+    confidence: number
+    violation_rate_upper_bound: number
+    exhaustive_grammar_size: number
+    is_exhaustive_over_grammar: boolean
+    honesty_notice: string
+  }
 }
 
 interface ProvidersInfo {
@@ -562,6 +572,23 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            <hr className="border-slate-800 my-3" />
+
+            <p className="text-slate-400 text-xs uppercase mb-2">Statistical Coverage (not a formal proof)</p>
+            <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+              <div>
+                <div className="text-slate-500 text-xs">Exhaustive over {report.statistical_proof.exhaustive_grammar_size}-case grammar</div>
+                <div className={`font-semibold ${report.statistical_proof.is_exhaustive_over_grammar ? 'text-emerald-400' : 'text-slate-300'}`}>
+                  {report.statistical_proof.is_exhaustive_over_grammar ? 'YES' : `no (${report.statistical_proof.trials} trials)`}
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-500 text-xs">True violation rate upper bound ({(report.statistical_proof.confidence * 100).toFixed(0)}% confidence)</div>
+                <div className="font-semibold">{(report.statistical_proof.violation_rate_upper_bound * 100).toFixed(1)}%</div>
+              </div>
+            </div>
+            <p className="text-slate-500 text-xs">{report.statistical_proof.honesty_notice}</p>
           </Card>
 
           <Card title="Recommendations">

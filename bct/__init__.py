@@ -9,3 +9,4 @@ from .formal import (
     KeywordPredicate, LLMPredicate, Not, Or, Predicate, PredicateEvalResult, RegexPredicate,
 )
 from .synthesizer import ContractExample, ContractSynthesizer, SynthesizedContract
+from .statistical_proof import StatisticalCoverageProver, StatisticalProofReport, clopper_pearson_upper_bound

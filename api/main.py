@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from bct import (
     AgentNode, BehavioralContract, BehavioralContractVerifier, ContractExample, ContractGapAnalyzer,
-    ContractSynthesizer, DriftTracker, MultiAgentVerifier,
+    ContractSynthesizer, DriftTracker, MultiAgentVerifier, StatisticalCoverageProver,
 )
 from bct.llm_client import SUPPORTED_PROVIDERS, configured_provider
 
@@ -242,6 +242,8 @@ async def verify(req: ContractRequest):
     except RuntimeError as exc:
         raise HTTPException(400, str(exc))
 
+    proof = StatisticalCoverageProver().prove_from_report(report)
+
     return {
         "contract_name": report.contract_name,
         "total_tests": report.total_tests,
@@ -259,4 +261,14 @@ async def verify(req: ContractRequest):
         "recommendations": report.recommendations,
         "mode": report.mode,
         "case_generation": report.case_generation,
+        "statistical_proof": {
+            "trials": proof.trials,
+            "violations": proof.violations,
+            "observed_violation_rate": proof.observed_violation_rate,
+            "confidence": proof.confidence,
+            "violation_rate_upper_bound": proof.violation_rate_upper_bound,
+            "exhaustive_grammar_size": proof.exhaustive_grammar_size,
+            "is_exhaustive_over_grammar": proof.is_exhaustive_over_grammar,
+            "honesty_notice": proof.honesty_notice,
+        },
     }

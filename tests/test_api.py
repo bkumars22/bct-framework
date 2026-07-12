@@ -179,6 +179,20 @@ class TestVerify:
         assert "compliance_by_intensity" in body
         assert "recommendations" in body
 
+    def test_verify_includes_statistical_proof_with_honesty_notice(self):
+        resp = client.post("/verify", json={
+            "name": "test_contract", "system": "a test tutor",
+            "always": ["ask a question"], "never": ["give the answer"],
+            "use_simulation": True,
+        })
+        assert resp.status_code == 200
+        proof = resp.json()["statistical_proof"]
+        assert proof["trials"] == 30
+        assert proof["exhaustive_grammar_size"] == 30
+        assert proof["is_exhaustive_over_grammar"] is True
+        assert 0.0 <= proof["violation_rate_upper_bound"] <= 1.0
+        assert "NOT" in proof["honesty_notice"]
+
     def test_verify_without_key_and_without_simulation_returns_400(self):
         resp = client.post("/verify", json={
             "name": "test_contract", "system": "a test tutor",

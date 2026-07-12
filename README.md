@@ -223,6 +223,34 @@ This is honestly a training-set accuracy, not a generalization guarantee —
 run `verify()` against the synthesized contract to test it against new
 adversarial cases.
 
+## Statistical coverage claims (not a formal proof)
+
+No tool can formally prove a free-text behavioral contract holds for
+literally every possible natural-language input — that would require
+enumerating an infinite space, or a sound static analysis of the
+underlying LLM's weights, which is an unsolved research problem at this
+scale. `StatisticalCoverageProver` gives the closest legitimate,
+honestly-bounded claim instead, computed from an existing verification
+report (no extra LLM calls):
+
+1. Whether the run was exhaustive over BCT's own declared, finite
+   adversarial grammar (6 categories x 5 intensities = 30 combinations).
+2. An exact (Clopper-Pearson) PAC-style upper confidence bound on the
+   TRUE violation rate over the broader input distribution, given the
+   observed trials — e.g. "0 violations in 30 trials" becomes "95%
+   confident the true violation rate is at most ~14.9%," not "0%."
+
+```python
+from bct import StatisticalCoverageProver
+
+report = verifier.verify(contract)
+proof = StatisticalCoverageProver().prove_from_report(report)
+proof.print_report()  # always includes the explicit honesty boundary
+```
+
+`/verify`'s API response includes this under `statistical_proof`, and the
+dashboard shows it alongside the existing p-value/effect-size panel.
+
 ## Demo / simulated mode
 
 No API key? Pass `use_simulation=True` explicitly (or just run `demo.py` —
