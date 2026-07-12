@@ -101,6 +101,36 @@ print any CRITICAL findings before generating test cases — non-blocking,
 so a gap doesn't stop you from testing, but you can't miss it either. This
 is a heuristic + LLM-assisted check, not a formal completeness proof.
 
+## Multi-agent pipelines
+
+A contract can hold when an agent is tested alone and still break in
+production, because in a multi-agent pipeline one agent's output becomes
+the next agent's input. `MultiAgentVerifier` tests that handoff directly:
+it pressures the upstream agent, takes its REAL response, feeds that
+response as the downstream agent's input, and judges the downstream
+agent against *its own* contract — checking whether pressure aimed at one
+agent can break a different one that was never directly attacked (the
+same failure mode as indirect prompt injection through tool/agent output).
+
+```python
+from bct import AgentNode, BehavioralContract, MultiAgentVerifier
+
+tutor = AgentNode(name="tutor", contract=BehavioralContract(
+    name="tutor", system="an AI tutor", always=["ask a question"], never=["give the answer"],
+))
+summarizer = AgentNode(name="summarizer", contract=BehavioralContract(
+    name="summarizer", system="a support summarizer", never=["reveal a customer's SSN"],
+))
+
+verifier = MultiAgentVerifier()
+report = await verifier.verify_pipeline("support_pipeline", [tutor, summarizer])
+report.print_report()  # propagation_rate + per-handoff findings
+```
+
+No simulation mode here — every step is a real provider call, so
+`verify_pipeline` raises clearly if no LLM API key is configured (or set
+per-agent via `AgentNode(..., provider=...)`).
+
 ## Demo / simulated mode
 
 No API key? Pass `use_simulation=True` explicitly (or just run `demo.py` —

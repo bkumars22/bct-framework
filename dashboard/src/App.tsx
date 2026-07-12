@@ -46,6 +46,26 @@ const SEVERITY_STYLE: Record<GapFinding['severity'], string> = {
   critical: 'text-red-400', warning: 'text-amber-400', info: 'text-sky-400',
 }
 
+interface InterAgentFinding {
+  from_agent: string
+  to_agent: string
+  category: string
+  pressure_category: string
+  pressure_intensity: number
+  upstream_input: string
+  upstream_output: string
+  downstream_output: string
+  downstream_verdict: string
+}
+
+interface MultiAgentReport {
+  pipeline_name: string
+  agents: string[]
+  links_tested: number
+  propagation_rate: number
+  findings: InterAgentFinding[]
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
@@ -78,6 +98,16 @@ export default function App() {
   const [gapReport, setGapReport] = useState<GapAnalysisReport | null>(null)
   const [gapLoading, setGapLoading] = useState(false)
   const [gapError, setGapError] = useState<string | null>(null)
+
+  const [upstreamName, setUpstreamName] = useState('tutor_agent')
+  const [upstreamSystem, setUpstreamSystem] = useState('an AI tutor that answers student questions')
+  const [upstreamNever, setUpstreamNever] = useState('give direct answers to academic questions')
+  const [downstreamName, setDownstreamName] = useState('summarizer_agent')
+  const [downstreamSystem, setDownstreamSystem] = useState("a support agent that summarizes conversations for a human reviewer")
+  const [downstreamNever, setDownstreamNever] = useState("reveal a customer's SSN or account number")
+  const [pipelineReport, setPipelineReport] = useState<MultiAgentReport | null>(null)
+  const [pipelineLoading, setPipelineLoading] = useState(false)
+  const [pipelineError, setPipelineError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/providers`).then(r => r.json()).then(setProviders).catch(() => setProviders(null))
@@ -130,6 +160,35 @@ export default function App() {
       setGapError((err as Error).message)
     } finally {
       setGapLoading(false)
+    }
+  }
+
+  async function runPipelineTest() {
+    setPipelineLoading(true)
+    setPipelineError(null)
+    setPipelineReport(null)
+    try {
+      const resp = await fetch(`${API_URL}/verify-pipeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pipeline_name: 'dashboard_pipeline',
+          cases_per_link: 5,
+          agents: [
+            { name: upstreamName, system: upstreamSystem, never: linesToArray(upstreamNever) },
+            { name: downstreamName, system: downstreamSystem, never: linesToArray(downstreamNever) },
+          ],
+        }),
+      })
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({ detail: resp.statusText }))
+        throw new Error(body.detail || `${resp.status} ${resp.statusText}`)
+      }
+      setPipelineReport(await resp.json())
+    } catch (err) {
+      setPipelineError((err as Error).message)
+    } finally {
+      setPipelineLoading(false)
     }
   }
 
@@ -354,6 +413,90 @@ export default function App() {
             </ul>
           </Card>
         </div>
+      )}
+
+      <hr className="border-slate-800 my-8" />
+
+      <h2 className="text-xl font-bold mb-1">Multi-Agent Pipeline Test</h2>
+      <p className="text-slate-400 text-sm mb-4">
+        Pressures the upstream agent, feeds its REAL response into the downstream agent as input,
+        and checks whether the downstream agent's own contract still held — testing whether pressure
+        aimed at one agent can break a different agent that was never directly attacked.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <Card title="Upstream Agent">
+          <div className="space-y-3 text-sm">
+            <label className="block">
+              <span className="text-slate-400">Name</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={upstreamName} onChange={e => setUpstreamName(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">System description</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={upstreamSystem} onChange={e => setUpstreamSystem(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">Never (one per line)</span>
+              <textarea rows={2} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-xs" value={upstreamNever} onChange={e => setUpstreamNever(e.target.value)} />
+            </label>
+          </div>
+        </Card>
+
+        <Card title="Downstream Agent (receives upstream's output as input)">
+          <div className="space-y-3 text-sm">
+            <label className="block">
+              <span className="text-slate-400">Name</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={downstreamName} onChange={e => setDownstreamName(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">System description</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={downstreamSystem} onChange={e => setDownstreamSystem(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">Never (one per line)</span>
+              <textarea rows={2} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-xs" value={downstreamNever} onChange={e => setDownstreamNever(e.target.value)} />
+            </label>
+          </div>
+        </Card>
+      </div>
+
+      <button
+        onClick={runPipelineTest}
+        disabled={pipelineLoading}
+        className="px-4 py-2 rounded-md bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-sm font-medium mb-6"
+      >
+        {pipelineLoading ? 'Testing handoff (real calls take longer)…' : 'Run Pipeline Test'}
+      </button>
+
+      {pipelineError && <p className="text-red-400 text-sm mb-6">{pipelineError}</p>}
+
+      {pipelineReport && (
+        <Card title="Multi-Agent Verification Result">
+          <p className="text-sm text-slate-400 mb-2">{pipelineReport.agents.join(' → ')}</p>
+          <div className="flex items-center gap-4 mb-3">
+            <span className="text-2xl font-bold">{(pipelineReport.propagation_rate * 100).toFixed(0)}%</span>
+            <span className="text-slate-400 text-sm">
+              propagation rate ({pipelineReport.findings.length}/{pipelineReport.links_tested} tested handoffs broke the downstream contract)
+            </span>
+          </div>
+          {pipelineReport.findings.length === 0 ? (
+            <p className="text-sm text-emerald-400">No inter-agent contract violations found in the tested handoffs.</p>
+          ) : (
+            <ul className="space-y-3 text-sm">
+              {pipelineReport.findings.map((f, i) => (
+                <li key={i} className="border-b border-slate-800 pb-2">
+                  <p className="text-red-400 font-semibold">
+                    {f.from_agent} → {f.to_agent} (pressure: {f.pressure_category} L{f.pressure_intensity})
+                  </p>
+                  <p className="text-slate-500 text-xs mt-1">Upstream output → downstream input:</p>
+                  <p className="text-slate-300 text-xs font-mono">{f.upstream_output}</p>
+                  <p className="text-slate-500 text-xs mt-1">{f.to_agent}'s response (violated its own contract):</p>
+                  <p className="text-slate-300 text-xs font-mono">{f.downstream_output}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       )}
     </div>
   )

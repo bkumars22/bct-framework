@@ -22,7 +22,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from bct import BehavioralContract, BehavioralContractVerifier, ContractGapAnalyzer
+from bct import (
+    AgentNode, BehavioralContract, BehavioralContractVerifier, ContractGapAnalyzer, MultiAgentVerifier,
+)
 from bct.llm_client import SUPPORTED_PROVIDERS, configured_provider
 
 app = FastAPI(title="BCT API")
@@ -46,6 +48,22 @@ class ContractRequest(BaseModel):
     topic: str = "7 times 8"
     use_simulation: Optional[bool] = None  # None = auto: real if a key is configured, else simulated
     provider: Optional[str] = None
+
+
+class AgentRequest(BaseModel):
+    name: str
+    system: str
+    always: List[str] = []
+    never: List[str] = []
+    under_pressure: List[str] = []
+    provider: Optional[str] = None
+
+
+class PipelineRequest(BaseModel):
+    pipeline_name: str
+    agents: List[AgentRequest]
+    cases_per_link: int = 10
+    topic: Optional[str] = None
 
 
 def _safe_float(value: float) -> Optional[float]:
@@ -88,6 +106,43 @@ async def analyze_gaps(req: ContractRequest):
         "mode": report.mode,
         "findings": [
             {"category": f.category, "severity": f.severity, "message": f.message, "recommendation": f.recommendation}
+            for f in report.findings
+        ],
+    }
+
+
+@app.post("/verify-pipeline")
+async def verify_pipeline(req: PipelineRequest):
+    agents = [
+        AgentNode(
+            name=a.name,
+            contract=BehavioralContract(
+                name=a.name, system=a.system, always=a.always, never=a.never, under_pressure=a.under_pressure,
+            ),
+            provider=a.provider,
+        )
+        for a in req.agents
+    ]
+    verifier = MultiAgentVerifier()
+    try:
+        report = await verifier.verify_pipeline(
+            req.pipeline_name, agents, cases_per_link=req.cases_per_link, topic=req.topic,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(400, str(exc))
+
+    return {
+        "pipeline_name": report.pipeline_name,
+        "agents": report.agents,
+        "links_tested": report.links_tested,
+        "propagation_rate": report.propagation_rate,
+        "findings": [
+            {
+                "from_agent": f.from_agent, "to_agent": f.to_agent, "category": f.category,
+                "pressure_category": f.pressure_category, "pressure_intensity": f.pressure_intensity,
+                "upstream_input": f.upstream_input, "upstream_output": f.upstream_output,
+                "downstream_output": f.downstream_output, "downstream_verdict": f.downstream_verdict,
+            }
             for f in report.findings
         ],
     }
