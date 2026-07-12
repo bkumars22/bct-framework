@@ -1,0 +1,52 @@
+name: Deploy BCT Dashboard + Test Results to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python test dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests and generate JSON report
+        id: pytest
+        run: pytest --json-report --json-report-file=test-results.json
+        continue-on-error: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install and build dashboard (demo mode)
+        working-directory: dashboard
+        run: |
+          npm ci
+          npm run build:ghpages
+
+      - name: Add fresh test results + .nojekyll to build output
+        run: |
+          cp test-results.json dashboard/dist/test-results.json
+          touch dashboard/dist/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dashboard/dist
+
+      - name: Fail workflow if tests failed
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1

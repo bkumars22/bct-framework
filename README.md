@@ -4,6 +4,20 @@ The first framework for testing whether a
 domain-specific AI maintains its behavioral
 contract under graduated adversarial pressure.
 
+## Live demo
+
+**https://bkumars22.github.io/bct-framework/** — the actual dashboard
+(no backend on Pages, so it runs in demo mode against realistic canned
+data, clearly labeled). Every push to `main` rebuilds and redeploys it
+automatically, and the full test suite is rerun and published alongside
+it — click **Test Results** in the nav bar for pass/fail per test,
+results by module, and run duration, always current as of the latest
+commit.
+
+(One-time setup: in the repo's Settings → Pages, set Source to the
+`gh-pages` branch — the workflow creates that branch on first run but
+doesn't toggle this setting itself.)
+
 ## The Problem
 
 Traditional AI testing asks:
