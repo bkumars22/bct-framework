@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List
 
+from .formal import FormalRule
+
 @dataclass
 class BehavioralContract:
     name: str
@@ -9,6 +11,11 @@ class BehavioralContract:
     never: List[str]
     under_pressure: List[str] = field(default_factory=list)
     threshold: float = 0.90
+    # Optional formal-logic rules (Level 8) — deterministic/traceable
+    # predicates instead of a holistic natural-language LLM judge. When
+    # non-empty, verifier.py judges compliance with these INSTEAD of the
+    # free-text judge, since they're a stricter, reproducible substitute.
+    formal_rules: List[FormalRule] = field(default_factory=list)
 
     def to_system_prompt(self) -> str:
         """

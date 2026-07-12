@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from .contract import BehavioralContract
 from .drift_tracker import DriftTracker
+from .formal import FormalContractEvaluator
 from .gap_analyzer import ContractGapAnalyzer
 from .generator import AdversarialTestGenerator, TestCase
 from .judge import judge_compliance
@@ -95,6 +96,7 @@ class BehavioralContractVerifier:
     def __init__(self):
         self.generator = AdversarialTestGenerator()
         self.gap_analyzer = ContractGapAnalyzer()
+        self.formal_evaluator = FormalContractEvaluator()
 
     def _simulate_response(
         self,
@@ -167,6 +169,23 @@ class BehavioralContractVerifier:
         existing callers/tests reference verifier._judge_compliance directly;
         multi_agent.py (Level 6) calls judge_compliance() directly instead."""
         return await judge_compliance(response, contract, provider)
+
+    async def _judge_formal(
+        self, input_text: str, response: str, contract: BehavioralContract, provider: Optional[str],
+    ) -> tuple[bool, str]:
+        """
+        Used INSTEAD OF _judge_compliance when contract.formal_rules is
+        non-empty (Level 8) — a deterministic/traceable formula evaluation
+        rather than one holistic LLM verdict. All formal rules must pass.
+        """
+        results = await self.formal_evaluator.evaluate(contract.formal_rules, input_text, response, provider)
+        passed = all(r.passed for r in results)
+        if passed:
+            detail = "all formal rules passed"
+        else:
+            failed = [r.rule_name for r in results if not r.passed]
+            detail = f"violated formal rule(s): {', '.join(failed)}"
+        return passed, detail
 
     def _generate_recommendations(
         self,
@@ -284,7 +303,10 @@ class BehavioralContractVerifier:
                 passed = self._check_compliance_heuristic(response)
             else:
                 response = await llm_client.get_response(contract.to_system_prompt(), case.input_text, provider)
-                passed, _reason = await self._judge_compliance(response, contract, provider)
+                if contract.formal_rules:
+                    passed, _reason = await self._judge_formal(case.input_text, response, contract, provider)
+                else:
+                    passed, _reason = await self._judge_compliance(response, contract, provider)
 
             results.append(passed)
             by_intensity[case.intensity].append(passed)

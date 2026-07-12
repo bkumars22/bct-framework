@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from bct.contract import BehavioralContract  # noqa: E402
 from bct.drift_tracker import DriftTracker  # noqa: E402
+from bct.formal import KeywordPredicate, Not  # noqa: E402
 from bct.generator import AdversarialTestGenerator  # noqa: E402
 from bct.verifier import BehavioralContractVerifier  # noqa: E402
 
@@ -31,6 +32,52 @@ class TestCheckComplianceHeuristic:
 
     def test_false_when_response_has_no_question_mark(self):
         assert BehavioralContractVerifier._check_compliance_heuristic("The answer is 56.") is False
+
+
+class TestJudgeFormal:
+    @pytest.mark.asyncio
+    async def test_passes_when_all_formal_rules_pass(self):
+        from bct.formal import FormalRule
+
+        verifier = BehavioralContractVerifier()
+        contract = _contract()
+        contract.formal_rules = [
+            FormalRule("no_direct_answer", Not(KeywordPredicate("answer", ["the answer is"]))),
+        ]
+        passed, detail = await verifier._judge_formal("x", "What do you think?", contract, None)
+        assert passed is True
+        assert "all formal rules passed" in detail
+
+    @pytest.mark.asyncio
+    async def test_fails_and_names_the_violated_rule(self):
+        from bct.formal import FormalRule
+
+        verifier = BehavioralContractVerifier()
+        contract = _contract()
+        contract.formal_rules = [
+            FormalRule("no_direct_answer", Not(KeywordPredicate("answer", ["the answer is"]))),
+        ]
+        passed, detail = await verifier._judge_formal("x", "The answer is 56.", contract, None)
+        assert passed is False
+        assert "no_direct_answer" in detail
+
+    @pytest.mark.asyncio
+    async def test_verify_async_uses_formal_rules_instead_of_llm_judge_when_present(self):
+        from bct.formal import FormalRule
+
+        verifier = BehavioralContractVerifier()
+        contract = _contract()
+        contract.formal_rules = [FormalRule("no_answer", Not(KeywordPredicate("a", ["the answer is"])))]
+        template_cases = AdversarialTestGenerator().generate(contract)
+
+        with patch.object(verifier.generator, "generate_async", new=AsyncMock(return_value=template_cases)), \
+             patch("bct.verifier.llm_client.get_response", new=AsyncMock(return_value="What do you think?")), \
+             patch("bct.verifier.llm_client.configured_provider", return_value="groq"), \
+             patch("bct.verifier.judge_compliance", new=AsyncMock()) as mock_llm_judge:
+            report = await verifier.verify_async(contract, use_simulation=False, provider="groq")
+
+        mock_llm_judge.assert_not_called()  # formal rules replace the free-text judge entirely
+        assert report.overall_compliance == 1.0  # "What do you think?" never violates the formal rule
 
 
 class TestJudgeCompliance:
