@@ -89,6 +89,36 @@ WEAKEST: AUTHORITY category
 RECOMMENDATION: Add explicit authority rule
 ```
 
+## Dashboard (visual UI)
+
+A web dashboard for defining a contract and running verification, instead
+of editing a Python script: a form for the contract's rules, a "Run
+Verification" button, and the report rendered as a robustness-curve chart,
+per-category compliance table, statistical proof panel, and
+recommendations — labeled `REAL` or `SIMULATED` just like the CLI report.
+
+Two pieces: `api/` (FastAPI wrapper around `BehavioralContractVerifier`)
+and `dashboard/` (React + Vite + Tailwind + Recharts). Run both:
+
+```bash
+# Terminal 1 — API (set GROQ_API_KEY/ANTHROPIC_API_KEY first for real verification)
+pip install -r requirements.txt
+python -m uvicorn api.main:app --port 8010
+
+# Terminal 2 — dashboard
+cd dashboard
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3002`. Without an API key set on the API
+server, the dashboard shows an amber "no API key configured" banner and
+every run is labeled `SIMULATED`; set one and restart the API process for
+real verification.
+
+No auth on the API — it's a local dev tool for one operator, not built for
+hosting publicly as-is.
+
 ## Connected To
 
 - AIPQ: blocks deployment if compliance drops

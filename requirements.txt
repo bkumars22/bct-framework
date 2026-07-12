@@ -7,3 +7,7 @@ matplotlib>=3.8.0
 # you explicitly pass use_simulation=True.
 groq>=0.9.0
 anthropic>=0.30.0
+
+# Dashboard API (api/main.py)
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.1
