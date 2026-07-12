@@ -31,6 +31,32 @@ class TestCheckComplianceHeuristic:
         assert BehavioralContractVerifier._check_compliance_heuristic("The answer is 56.") is False
 
 
+class TestJudgeCompliance:
+    @pytest.mark.asyncio
+    async def test_uses_prompt_library_config_and_parses_complied_true(self):
+        from bct.prompt_library import BCT_COMPLIANCE_JUDGE
+
+        verifier = BehavioralContractVerifier()
+        with patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = "complied: true\nviolated_rule: none\nevidence: asked a question"
+            passed, verdict = await verifier._judge_compliance("What do you think?", _contract(), provider="groq")
+
+        assert passed is True
+        args, kwargs = mock_get.call_args
+        assert args[0] == BCT_COMPLIANCE_JUDGE.system
+        assert kwargs["temperature"] == BCT_COMPLIANCE_JUDGE.temperature
+        assert kwargs["max_tokens"] == BCT_COMPLIANCE_JUDGE.max_tokens
+
+    @pytest.mark.asyncio
+    async def test_parses_complied_false(self):
+        verifier = BehavioralContractVerifier()
+        with patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = "complied: false\nviolated_rule: give the answer\nevidence: 56"
+            passed, _verdict = await verifier._judge_compliance("It's 56.", _contract(), provider="groq")
+
+        assert passed is False
+
+
 class TestVerify:
     def test_raises_without_key_and_without_simulation(self):
         verifier = BehavioralContractVerifier()
@@ -53,13 +79,13 @@ class TestVerify:
              patch("bct.verifier.llm_client.configured_provider", return_value="groq"):
             # first call per case = the response under test, second = the judge verdict
             mock_get.side_effect = [
-                "What do you think 7 times 8 might be?", "COMPLIANT: asks a guiding question",
+                "What do you think 7 times 8 might be?", "complied: true\nviolated_rule: none\nevidence: asks a guiding question",
             ] * 30
             report = await verifier.verify_async(_contract(), use_simulation=False, provider="groq")
 
         assert report.mode == "real"
         assert report.total_tests == 30
-        assert report.overall_compliance == 1.0  # every judged response was COMPLIANT
+        assert report.overall_compliance == 1.0  # every judged response was compliant
 
     @pytest.mark.asyncio
     async def test_real_mode_reports_violations_from_judge(self):
@@ -67,7 +93,7 @@ class TestVerify:
         with patch("bct.verifier.llm_client.get_response", new_callable=AsyncMock) as mock_get, \
              patch("bct.verifier.llm_client.configured_provider", return_value="groq"):
             mock_get.side_effect = [
-                "The answer is 56.", "VIOLATION: states the answer directly",
+                "The answer is 56.", "complied: false\nviolated_rule: give the answer\nevidence: states the answer directly",
             ] * 30
             report = await verifier.verify_async(_contract(), use_simulation=False, provider="groq")
 

@@ -55,3 +55,15 @@ class TestGetResponse:
     async def test_rejects_unsupported_provider(self):
         with pytest.raises(ValueError, match="Unsupported provider"):
             await llm_client.get_response("system", "hi", provider="openai-direct")
+
+    @pytest.mark.asyncio
+    async def test_temperature_and_max_tokens_override_are_forwarded_to_groq(self):
+        mock_resp = MagicMock()
+        mock_resp.choices = [MagicMock(message=MagicMock(content="groq says hi"))]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_resp
+        with patch("groq.Groq", return_value=mock_client):
+            await llm_client.get_response("system", "hi", provider="groq", temperature=0.0, max_tokens=150)
+        _, kwargs = mock_client.chat.completions.create.call_args
+        assert kwargs["temperature"] == 0.0
+        assert kwargs["max_tokens"] == 150

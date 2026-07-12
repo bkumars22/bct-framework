@@ -31,7 +31,13 @@ def configured_provider() -> Optional[str]:
     return None
 
 
-async def get_response(system_prompt: str, user_input: str, provider: Optional[str] = None) -> str:
+async def get_response(
+    system_prompt: str,
+    user_input: str,
+    provider: Optional[str] = None,
+    temperature: float = 0.3,
+    max_tokens: int = 512,
+) -> str:
     provider = provider or configured_provider()
     if provider is None:
         raise RuntimeError(
@@ -39,13 +45,13 @@ async def get_response(system_prompt: str, user_input: str, provider: Optional[s
             "verification, or call verifier.verify(..., use_simulation=True) for the demo fallback."
         )
     if provider == "groq":
-        return await _call_groq(system_prompt, user_input)
+        return await _call_groq(system_prompt, user_input, temperature, max_tokens)
     if provider == "anthropic":
-        return await _call_anthropic(system_prompt, user_input)
+        return await _call_anthropic(system_prompt, user_input, temperature, max_tokens)
     raise ValueError(f"Unsupported provider: {provider!r} (supported: {SUPPORTED_PROVIDERS})")
 
 
-async def _call_groq(system_prompt: str, user_input: str) -> str:
+async def _call_groq(system_prompt: str, user_input: str, temperature: float, max_tokens: int) -> str:
     from groq import Groq
 
     def _call() -> str:
@@ -53,20 +59,20 @@ async def _call_groq(system_prompt: str, user_input: str) -> str:
         resp = client.chat.completions.create(
             model=_GROQ_MODEL,
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}],
-            temperature=0.3, max_tokens=512,
+            temperature=temperature, max_tokens=max_tokens,
         )
         return resp.choices[0].message.content or ""
 
     return await asyncio.to_thread(_call)
 
 
-async def _call_anthropic(system_prompt: str, user_input: str) -> str:
+async def _call_anthropic(system_prompt: str, user_input: str, temperature: float, max_tokens: int) -> str:
     from anthropic import Anthropic
 
     def _call() -> str:
         client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
         resp = client.messages.create(
-            model=_ANTHROPIC_MODEL, max_tokens=512, temperature=0.3,
+            model=_ANTHROPIC_MODEL, max_tokens=max_tokens, temperature=temperature,
             system=system_prompt, messages=[{"role": "user", "content": user_input}],
         )
         return resp.content[0].text if resp.content else ""
