@@ -22,7 +22,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from bct import BehavioralContract, BehavioralContractVerifier
+from bct import BehavioralContract, BehavioralContractVerifier, ContractGapAnalyzer
 from bct.llm_client import SUPPORTED_PROVIDERS, configured_provider
 
 app = FastAPI(title="BCT API")
@@ -64,6 +64,33 @@ async def health():
 @app.get("/providers")
 async def providers():
     return {"configured": configured_provider(), "supported": list(SUPPORTED_PROVIDERS)}
+
+
+@app.post("/analyze-gaps")
+async def analyze_gaps(req: ContractRequest):
+    contract = BehavioralContract(
+        name=req.name, system=req.system, always=req.always, never=req.never,
+        under_pressure=req.under_pressure, threshold=req.threshold,
+    )
+    use_simulation = req.use_simulation
+    if use_simulation is None:
+        use_simulation = configured_provider() is None and req.provider is None
+
+    analyzer = ContractGapAnalyzer()
+    if use_simulation:
+        report = analyzer.analyze(contract)
+    else:
+        report = await analyzer.analyze_async(contract, provider=req.provider)
+
+    return {
+        "contract_name": report.contract_name,
+        "completeness_score": report.completeness_score,
+        "mode": report.mode,
+        "findings": [
+            {"category": f.category, "severity": f.severity, "message": f.message, "recommendation": f.recommendation}
+            for f in report.findings
+        ],
+    }
 
 
 @app.post("/verify")

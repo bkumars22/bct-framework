@@ -78,6 +78,29 @@ a fixed template set and labels the report `case_generation: template_fallback`
 rather than failing the whole run silently. `report.case_generation` is
 always one of `llm_synthesis`, `template`, or `template_fallback`.
 
+## Gap analysis (before testing)
+
+A contract can look reasonable and still leave real gaps — no rule for
+authority-claim override, nothing about non-English languages, a
+contradiction between an ALWAYS and a NEVER rule, a threshold outside
+`(0, 1]`. `ContractGapAnalyzer` checks for these *before* you run
+verification, so an incomplete contract gets caught before an incident (or
+an EU AI Act reviewer) catches it for you.
+
+```python
+from bct import BehavioralContract, ContractGapAnalyzer
+
+analyzer = ContractGapAnalyzer()
+report = analyzer.analyze(contract)          # heuristic, no LLM needed
+# or: report = await analyzer.analyze_async(contract)  # + LLM-identified gaps
+report.print_report()
+```
+
+`verify()`/`verify_async()` also run the heuristic check automatically and
+print any CRITICAL findings before generating test cases — non-blocking,
+so a gap doesn't stop you from testing, but you can't miss it either. This
+is a heuristic + LLM-assisted check, not a formal completeness proof.
+
 ## Demo / simulated mode
 
 No API key? Pass `use_simulation=True` explicitly (or just run `demo.py` —

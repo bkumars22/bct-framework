@@ -27,6 +27,25 @@ interface ProvidersInfo {
   supported: string[]
 }
 
+interface GapFinding {
+  category: string
+  severity: 'critical' | 'warning' | 'info'
+  message: string
+  recommendation: string
+}
+
+interface GapAnalysisReport {
+  contract_name: string
+  completeness_score: number
+  mode: 'heuristic' | 'llm_augmented' | 'llm_augmentation_failed'
+  findings: GapFinding[]
+}
+
+const SEVERITY_ORDER: Record<GapFinding['severity'], number> = { critical: 0, warning: 1, info: 2 }
+const SEVERITY_STYLE: Record<GapFinding['severity'], string> = {
+  critical: 'text-red-400', warning: 'text-amber-400', info: 'text-sky-400',
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
@@ -56,6 +75,9 @@ export default function App() {
   const [report, setReport] = useState<VerificationReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gapReport, setGapReport] = useState<GapAnalysisReport | null>(null)
+  const [gapLoading, setGapLoading] = useState(false)
+  const [gapError, setGapError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/providers`).then(r => r.json()).then(setProviders).catch(() => setProviders(null))
@@ -83,6 +105,31 @@ export default function App() {
       setError((err as Error).message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function checkForGaps() {
+    setGapLoading(true)
+    setGapError(null)
+    setGapReport(null)
+    try {
+      const resp = await fetch(`${API_URL}/analyze-gaps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name, system, topic, threshold,
+          always: linesToArray(always), never: linesToArray(never), under_pressure: linesToArray(underPressure),
+        }),
+      })
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({ detail: resp.statusText }))
+        throw new Error(body.detail || `${resp.status} ${resp.statusText}`)
+      }
+      setGapReport(await resp.json())
+    } catch (err) {
+      setGapError((err as Error).message)
+    } finally {
+      setGapLoading(false)
     }
   }
 
@@ -160,15 +207,55 @@ export default function App() {
         </Card>
       </div>
 
-      <button
-        onClick={runVerification}
-        disabled={loading}
-        className="px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-sm font-medium mb-6"
-      >
-        {loading ? 'Running verification (real calls take longer)…' : 'Run Verification'}
-      </button>
+      <div className="flex gap-3 mb-6">
+        <button
+          onClick={checkForGaps}
+          disabled={gapLoading}
+          className="px-4 py-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-sm font-medium"
+        >
+          {gapLoading ? 'Checking for gaps…' : 'Check for Gaps (before testing)'}
+        </button>
+        <button
+          onClick={runVerification}
+          disabled={loading}
+          className="px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-sm font-medium"
+        >
+          {loading ? 'Running verification (real calls take longer)…' : 'Run Verification'}
+        </button>
+      </div>
 
+      {gapError && <p className="text-red-400 text-sm mb-6">{gapError}</p>}
       {error && <p className="text-red-400 text-sm mb-6">{error}</p>}
+
+      {gapReport && (
+        <Card title="Contract Gap Analysis">
+          <div className="flex items-center gap-4 mb-3">
+            <span className="text-lg font-bold">{(gapReport.completeness_score * 100).toFixed(0)}% complete</span>
+            <span className={`text-xs font-semibold px-2 py-1 rounded ${
+              gapReport.mode === 'llm_augmented' ? 'bg-emerald-900/40 text-emerald-400' : 'bg-amber-900/40 text-amber-400'
+            }`}>
+              {gapReport.mode.toUpperCase()}
+            </span>
+          </div>
+          {gapReport.findings.length === 0 ? (
+            <p className="text-sm text-slate-300">No gaps found by the checks this tool runs.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {[...gapReport.findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]).map((f, i) => (
+                <li key={i} className="border-b border-slate-800 pb-2">
+                  <span className={`font-semibold uppercase text-xs ${SEVERITY_STYLE[f.severity]}`}>{f.severity}</span>
+                  {' '}<span className="text-slate-400 text-xs">[{f.category}]</span>
+                  <p className="text-slate-300">{f.message}</p>
+                  <p className="text-slate-500 text-xs">→ {f.recommendation}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-slate-500 text-xs mt-3">
+            Heuristic + LLM-assisted completeness check — not a formal proof the contract is complete.
+          </p>
+        </Card>
+      )}
 
       {report && (
         <div className="space-y-4">

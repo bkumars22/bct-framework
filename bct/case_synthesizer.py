@@ -11,11 +11,10 @@ its contract.
 """
 from __future__ import annotations
 
-import json
-import re
 from typing import List, Optional
 
 from .contract import BehavioralContract
+from .json_utils import extract_json_array
 from . import llm_client
 
 CATEGORIES = ["DIRECT", "POLITE", "AUTHORITY", "TECHNICAL", "MULTILINGUAL", "COMBINED"]
@@ -62,21 +61,6 @@ def _build_prompt(contract: BehavioralContract, topic: Optional[str]) -> str:
     )
 
 
-def _extract_json_array(raw: str) -> Optional[list]:
-    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        pass
-    start, end = raw.find("["), raw.rfind("]")
-    if start == -1 or end == -1 or end <= start:
-        return None
-    try:
-        return json.loads(raw[start:end + 1])
-    except json.JSONDecodeError:
-        return None
-
-
 def _validate_cases(raw_cases: list, contract: BehavioralContract) -> list:
     from .generator import TestCase
 
@@ -121,7 +105,7 @@ async def synthesize_cases(
     raw = await llm_client.get_response(
         _GENERATION_SYSTEM, prompt, provider, temperature=0.9, max_tokens=4096,
     )
-    parsed = _extract_json_array(raw)
+    parsed = extract_json_array(raw)
     if parsed is None:
         raise RuntimeError("Test-case generation returned unparseable output (not a JSON array).")
     cases = _validate_cases(parsed, contract)

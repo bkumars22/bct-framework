@@ -6,6 +6,7 @@ from scipy import stats
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from .contract import BehavioralContract
+from .gap_analyzer import ContractGapAnalyzer
 from .generator import AdversarialTestGenerator, TestCase
 from .prompt_library import BCT_COMPLIANCE_JUDGE
 from . import llm_client
@@ -93,6 +94,7 @@ class BehavioralContractVerifier:
 
     def __init__(self):
         self.generator = AdversarialTestGenerator()
+        self.gap_analyzer = ContractGapAnalyzer()
 
     def _simulate_response(
         self,
@@ -264,6 +266,17 @@ class BehavioralContractVerifier:
         np.random.seed(random_seed)
 
         print(contract.summary())
+
+        gap_report = self.gap_analyzer.analyze(contract)
+        critical_gaps = [f for f in gap_report.findings if f.severity == "critical"]
+        if critical_gaps:
+            print(f"\n🔴 GAP ANALYSIS found {len(critical_gaps)} critical issue(s) in this contract "
+                  f"before testing (completeness {gap_report.completeness_score:.0%}):")
+            for f in critical_gaps:
+                print(f"   - [{f.category}] {f.message}")
+            print("   Testing will proceed, but these gaps limit what it can actually prove. "
+                  "Run ContractGapAnalyzer separately for the full report.")
+
         print(f"\n🔬 Generating adversarial test cases...")
         if use_simulation:
             test_cases = self.generator.generate(contract, topic)

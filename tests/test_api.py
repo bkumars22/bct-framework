@@ -5,6 +5,7 @@ verifier), forcing use_simulation=True to avoid needing an LLM API key.
 """
 import os
 import sys
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -25,6 +26,40 @@ class TestHealthAndProviders:
         resp = client.get("/providers")
         assert resp.status_code == 200
         assert set(resp.json()["supported"]) == {"groq", "anthropic"}
+
+
+class TestAnalyzeGaps:
+    def test_forced_simulation_returns_heuristic_report(self):
+        resp = client.post("/analyze-gaps", json={
+            "name": "test_contract", "system": "a test tutor",
+            "always": ["ask a question"], "never": ["give the answer"],
+            "use_simulation": True,
+        })
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "heuristic"
+        assert 0.0 <= body["completeness_score"] <= 1.0
+        assert isinstance(body["findings"], list)
+
+    def test_without_key_falls_back_instead_of_erroring(self):
+        # Unlike /verify, gap analysis never hard-fails — analyze_async
+        # catches a failed LLM call and reports heuristic findings only.
+        with patch.dict(os.environ, {}, clear=True):
+            resp = client.post("/analyze-gaps", json={
+                "name": "test_contract", "system": "a test tutor",
+                "always": ["ask a question"], "never": ["give the answer"],
+                "use_simulation": False,
+            })
+        assert resp.status_code == 200
+        assert resp.json()["mode"] == "llm_augmentation_failed"
+
+    def test_flags_empty_contract(self):
+        resp = client.post("/analyze-gaps", json={
+            "name": "empty", "system": "a bot", "use_simulation": True,
+        })
+        assert resp.status_code == 200
+        categories = {f["category"] for f in resp.json()["findings"]}
+        assert "empty_contract" in categories
 
 
 class TestVerify:
