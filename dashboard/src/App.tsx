@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8010'
 
@@ -66,6 +66,32 @@ interface MultiAgentReport {
   findings: InterAgentFinding[]
 }
 
+interface DriftHistoryPoint {
+  timestamp: string
+  overall_compliance: number
+  mode: string
+}
+
+interface DriftFinding {
+  run_index: number
+  timestamp: string
+  message: string
+}
+
+interface DriftAnalysis {
+  contract_name: string
+  num_runs: number
+  history: DriftHistoryPoint[]
+  baseline_compliance: number | null
+  current_compliance: number | null
+  trend_slope: number | null
+  trend_p_value: number | null
+  step_p_value: number | null
+  drift_detected: boolean
+  mode: 'insufficient_data' | 'stable' | 'drift_detected'
+  findings: DriftFinding[]
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
@@ -108,6 +134,10 @@ export default function App() {
   const [pipelineReport, setPipelineReport] = useState<MultiAgentReport | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(false)
   const [pipelineError, setPipelineError] = useState<string | null>(null)
+
+  const [driftReport, setDriftReport] = useState<DriftAnalysis | null>(null)
+  const [driftLoading, setDriftLoading] = useState(false)
+  const [driftError, setDriftError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/providers`).then(r => r.json()).then(setProviders).catch(() => setProviders(null))
@@ -192,6 +222,24 @@ export default function App() {
     }
   }
 
+  async function checkDrift() {
+    setDriftLoading(true)
+    setDriftError(null)
+    setDriftReport(null)
+    try {
+      const resp = await fetch(`${API_URL}/drift/${encodeURIComponent(name)}?min_runs=3`)
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({ detail: resp.statusText }))
+        throw new Error(body.detail || `${resp.status} ${resp.statusText}`)
+      }
+      setDriftReport(await resp.json())
+    } catch (err) {
+      setDriftError((err as Error).message)
+    } finally {
+      setDriftLoading(false)
+    }
+  }
+
   const intensityData = report
     ? Object.entries(report.compliance_by_intensity)
         .sort(([a], [b]) => Number(a) - Number(b))
@@ -205,6 +253,10 @@ export default function App() {
     ? Object.entries(report.compliance_by_category)
         .sort(([, a], [, b]) => a - b)
         .map(([category, score]) => ({ category, compliance: Math.round(score * 100), passes: score >= report.threshold }))
+    : []
+
+  const driftHistoryData = driftReport
+    ? driftReport.history.map((h, i) => ({ run: `#${i + 1}`, compliance: Math.round(h.overall_compliance * 100) }))
     : []
 
   return (
@@ -281,10 +333,57 @@ export default function App() {
         >
           {loading ? 'Running verification (real calls take longer)…' : 'Run Verification'}
         </button>
+        <button
+          onClick={checkDrift}
+          disabled={driftLoading}
+          className="px-4 py-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-sm font-medium"
+        >
+          {driftLoading ? 'Checking drift…' : 'Check Drift History'}
+        </button>
       </div>
 
       {gapError && <p className="text-red-400 text-sm mb-6">{gapError}</p>}
       {error && <p className="text-red-400 text-sm mb-6">{error}</p>}
+      {driftError && <p className="text-red-400 text-sm mb-6">{driftError}</p>}
+
+      {driftReport && (
+        <Card title="Behavioral Drift Over Time">
+          {driftReport.mode === 'insufficient_data' ? (
+            <p className="text-sm text-slate-300">
+              Only {driftReport.num_runs} run(s) recorded for "{driftReport.contract_name}" — run
+              Verification at least 3 times (each call is recorded automatically) to see a trend.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-4 mb-3">
+                <span className={`text-lg font-bold ${driftReport.drift_detected ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {driftReport.drift_detected ? 'DRIFT DETECTED' : 'STABLE'}
+                </span>
+                <span className="text-slate-400 text-sm">
+                  {driftReport.num_runs} runs — baseline {((driftReport.baseline_compliance ?? 0) * 100).toFixed(0)}%,
+                  {' '}current {((driftReport.current_compliance ?? 0) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-40 mb-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={driftHistoryData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="run" stroke="#94a3b8" fontSize={12} />
+                    <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={12} unit="%" />
+                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155' }} />
+                    <Line type="monotone" dataKey="compliance" stroke="#38bdf8" strokeWidth={2} dot />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              {driftReport.findings.length > 0 && (
+                <ul className="space-y-1 text-sm text-red-400">
+                  {driftReport.findings.map((f, i) => <li key={i}>⚠ {f.message}</li>)}
+                </ul>
+              )}
+            </>
+          )}
+        </Card>
+      )}
 
       {gapReport && (
         <Card title="Contract Gap Analysis">

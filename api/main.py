@@ -23,11 +23,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from bct import (
-    AgentNode, BehavioralContract, BehavioralContractVerifier, ContractGapAnalyzer, MultiAgentVerifier,
+    AgentNode, BehavioralContract, BehavioralContractVerifier, ContractGapAnalyzer,
+    DriftTracker, MultiAgentVerifier,
 )
 from bct.llm_client import SUPPORTED_PROVIDERS, configured_provider
 
 app = FastAPI(title="BCT API")
+
+# Every /verify call is recorded here so repeated runs of the same contract
+# build a real history for /drift/{contract_name} to analyze — Level 7's
+# whole premise is behavior measured over time, not a single point.
+API_HISTORY_PATH = os.path.join(os.path.dirname(__file__), "bct_api_history.jsonl")
 
 app.add_middleware(
     CORSMiddleware,
@@ -148,6 +154,30 @@ async def verify_pipeline(req: PipelineRequest):
     }
 
 
+@app.get("/drift/{contract_name}")
+async def drift(contract_name: str, min_runs: int = 5):
+    report = DriftTracker(API_HISTORY_PATH).detect_drift(contract_name, min_runs=min_runs)
+    return {
+        "contract_name": report.contract_name,
+        "num_runs": report.num_runs,
+        "history": [
+            {"timestamp": r.timestamp, "overall_compliance": r.overall_compliance, "mode": r.mode}
+            for r in report.history
+        ],
+        "baseline_compliance": _safe_float(report.baseline_compliance),
+        "current_compliance": _safe_float(report.current_compliance),
+        "trend_slope": _safe_float(report.trend_slope),
+        "trend_p_value": _safe_float(report.trend_p_value),
+        "step_p_value": _safe_float(report.step_p_value),
+        "drift_detected": report.drift_detected,
+        "mode": report.mode,
+        "findings": [
+            {"run_index": f.run_index, "timestamp": f.timestamp, "message": f.message}
+            for f in report.findings
+        ],
+    }
+
+
 @app.post("/verify")
 async def verify(req: ContractRequest):
     contract = BehavioralContract(
@@ -163,6 +193,7 @@ async def verify(req: ContractRequest):
     try:
         report = await verifier.verify_async(
             contract, topic=req.topic, use_simulation=use_simulation, provider=req.provider,
+            history_path=API_HISTORY_PATH,
         )
     except RuntimeError as exc:
         raise HTTPException(400, str(exc))

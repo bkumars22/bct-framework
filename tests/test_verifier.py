@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from bct.contract import BehavioralContract  # noqa: E402
+from bct.drift_tracker import DriftTracker  # noqa: E402
 from bct.generator import AdversarialTestGenerator  # noqa: E402
 from bct.verifier import BehavioralContractVerifier  # noqa: E402
 
@@ -128,3 +129,21 @@ class TestVerify:
         with patch.dict(os.environ, {}, clear=True):
             report = verifier.verify(_contract(), use_simulation=True, random_seed=1)
         assert report.case_generation == "template"
+
+    def test_history_path_records_a_run_when_provided(self, tmp_path):
+        history_path = str(tmp_path / "history.jsonl")
+        verifier = BehavioralContractVerifier()
+        with patch.dict(os.environ, {}, clear=True):
+            report = verifier.verify(
+                _contract(), use_simulation=True, random_seed=1, history_path=history_path,
+            )
+        runs = DriftTracker(history_path).history(_contract().name)
+        assert len(runs) == 1
+        assert runs[0].overall_compliance == report.overall_compliance
+
+    def test_no_history_file_written_when_history_path_omitted(self, tmp_path):
+        history_path = str(tmp_path / "history.jsonl")
+        verifier = BehavioralContractVerifier()
+        with patch.dict(os.environ, {}, clear=True):
+            verifier.verify(_contract(), use_simulation=True, random_seed=1)
+        assert not os.path.exists(history_path)

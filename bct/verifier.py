@@ -5,6 +5,7 @@ from scipy import stats
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from .contract import BehavioralContract
+from .drift_tracker import DriftTracker
 from .gap_analyzer import ContractGapAnalyzer
 from .generator import AdversarialTestGenerator, TestCase
 from .judge import judge_compliance
@@ -225,6 +226,7 @@ class BehavioralContractVerifier:
         random_seed: int = 42,
         use_simulation: bool = False,
         provider: Optional[str] = None,
+        history_path: Optional[str] = None,
     ) -> VerificationReport:
         """
         Run full behavioral contract verification. Real by default — raises
@@ -325,7 +327,7 @@ class BehavioralContractVerifier:
             ci_by_category, breaking_point, contract.threshold
         )
 
-        return VerificationReport(
+        report = VerificationReport(
             contract_name=contract.name,
             total_tests=len(results),
             passed_tests=sum(results),
@@ -344,6 +346,17 @@ class BehavioralContractVerifier:
             case_generation=case_generation,
         )
 
+        if history_path is not None:
+            DriftTracker(history_path).record(
+                contract_name=contract.name,
+                overall_compliance=report.overall_compliance,
+                total_tests=report.total_tests,
+                passed_tests=report.passed_tests,
+                mode=report.mode,
+            )
+
+        return report
+
     def verify(
         self,
         contract: BehavioralContract,
@@ -351,6 +364,7 @@ class BehavioralContractVerifier:
         random_seed: int = 42,
         use_simulation: bool = False,
         provider: Optional[str] = None,
+        history_path: Optional[str] = None,
     ) -> VerificationReport:
         """Sync wrapper around verify_async — most callers don't want to deal with asyncio directly."""
-        return asyncio.run(self.verify_async(contract, topic, random_seed, use_simulation, provider))
+        return asyncio.run(self.verify_async(contract, topic, random_seed, use_simulation, provider, history_path))

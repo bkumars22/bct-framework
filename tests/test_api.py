@@ -7,14 +7,25 @@ import os
 import sys
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+import api.main as api_main  # noqa: E402
 from api.main import app  # noqa: E402
 from bct.generator import TestCase  # noqa: E402
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_history(tmp_path, monkeypatch):
+    """/verify writes to API_HISTORY_PATH on every call — point it at a
+    throwaway file so running this suite never touches the real
+    api/bct_api_history.jsonl used by an actual running dashboard."""
+    monkeypatch.setattr(api_main, "API_HISTORY_PATH", str(tmp_path / "history.jsonl"))
 
 
 class TestHealthAndProviders:
@@ -148,3 +159,28 @@ class TestVerify:
         ci = resp.json()["confidence_interval"]
         for bound in ci:
             assert bound is None or bound == bound  # NaN != NaN
+
+
+class TestDrift:
+    def test_returns_insufficient_data_with_no_recorded_runs(self):
+        resp = client.get("/drift/never_verified_contract")
+        assert resp.status_code == 200
+        assert resp.json()["mode"] == "insufficient_data"
+        assert resp.json()["num_runs"] == 0
+
+    def test_verify_calls_accumulate_into_drift_history(self):
+        payload = {
+            "name": "drift_test_contract", "system": "a test tutor",
+            "always": ["ask a question"], "never": ["give the answer"],
+            "use_simulation": True,
+        }
+        for _ in range(3):
+            resp = client.post("/verify", json=payload)
+            assert resp.status_code == 200
+
+        drift_resp = client.get("/drift/drift_test_contract", params={"min_runs": 3})
+        assert drift_resp.status_code == 200
+        body = drift_resp.json()
+        assert body["num_runs"] == 3
+        assert body["mode"] in ("stable", "drift_detected")
+        assert len(body["history"]) == 3

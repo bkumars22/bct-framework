@@ -131,6 +131,31 @@ No simulation mode here — every step is a real provider call, so
 `verify_pipeline` raises clearly if no LLM API key is configured (or set
 per-agent via `AgentNode(..., provider=...)`).
 
+## Behavioral drift over time
+
+A single verification run is a snapshot. `DriftTracker` records each run
+to a local history file and tests that history for statistically
+significant decline — the difference between "this contract passed once"
+and "this AI has stayed reliable," which is what a long-term reliability
+claim (the kind an insurer or compliance reviewer wants) actually needs.
+
+```python
+from bct import DriftTracker
+
+report = verifier.verify(contract, history_path="bct_history.jsonl")  # records this run
+
+tracker = DriftTracker("bct_history.jsonl")
+drift = tracker.detect_drift(contract.name, min_runs=5)
+drift.print_report()  # trend + step-change tests, not just a threshold
+```
+
+Two independent statistical checks, either of which flags drift: a
+two-proportion z-test comparing the latest run against the accumulated
+baseline (catches a sudden drop), and a linear-regression trend test
+across all runs (catches a slow decline). The dashboard's `/verify`
+endpoint records every run automatically and exposes `/drift/{contract_name}`
+to visualize the trend.
+
 ## Demo / simulated mode
 
 No API key? Pass `use_simulation=True` explicitly (or just run `demo.py` —
