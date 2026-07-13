@@ -10,3 +10,4 @@ from .formal import (
 )
 from .synthesizer import ContractExample, ContractSynthesizer, SynthesizedContract
 from .statistical_proof import StatisticalCoverageProver, StatisticalProofReport, clopper_pearson_upper_bound
+from .templates import list_template_ids, load_all_templates, load_template

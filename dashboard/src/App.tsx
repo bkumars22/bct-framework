@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
-  analyzeGaps, checkDrift as checkDriftApi, DEMO_MODE, fetchProviders, synthesizeContract as synthesizeContractApi,
-  verifyContract, verifyPipeline, verifyQaip, verifyZentravix,
+  analyzeGaps, checkDrift as checkDriftApi, DEMO_MODE, fetchProviders, fetchTemplates,
+  synthesizeContract as synthesizeContractApi, verifyContract, verifyPipeline, verifyQaip, verifyZentravix,
 } from './api'
 import { Card } from './components'
 import Projects from './Projects'
 import TestResults from './TestResults'
 import type {
-  DriftAnalysis, GapAnalysisReport, GapFinding, MultiAgentReport, ProvidersInfo,
+  ContractTemplate, DriftAnalysis, GapAnalysisReport, GapFinding, MultiAgentReport, ProvidersInfo,
   QAIPVerificationReport, SynthesizedContractResult, VerificationReport, ZentravixVerificationReport,
 } from './types'
 
@@ -56,6 +56,8 @@ export default function App() {
   }
 
   const [providers, setProviders] = useState<ProvidersInfo | null>(null)
+  const [templates, setTemplates] = useState<ContractTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [name, setName] = useState('aria_socratic_teaching')
   const [system, setSystem] = useState('Free AI tutor for 1.6 billion children — 35 languages')
   const [topic, setTopic] = useState('7 times 8')
@@ -107,7 +109,20 @@ export default function App() {
 
   useEffect(() => {
     fetchProviders().then(setProviders).catch(() => setProviders(null))
+    fetchTemplates().then(setTemplates).catch(() => setTemplates([]))
   }, [])
+
+  function applyTemplate(templateId: string) {
+    setSelectedTemplateId(templateId)
+    const t = templates.find(t => t.id === templateId)
+    if (!t) return
+    setName(t.name)
+    setSystem(t.system)
+    setAlways(t.always.join('\n'))
+    setNever(t.never.join('\n'))
+    setUnderPressure(t.under_pressure.join('\n'))
+    setThreshold(t.threshold)
+  }
 
   async function runVerification() {
     setLoading(true)
@@ -282,6 +297,22 @@ export default function App() {
             <span className="text-amber-400">● No API key configured — verification will run SIMULATED (set GROQ_API_KEY or ANTHROPIC_API_KEY on the API server for real verification)</span>
           )}
         </p>
+      )}
+
+      {templates.length > 0 && (
+        <label className="block mb-4 text-sm max-w-md">
+          <span className="text-slate-400">Start from a template</span>
+          <select
+            className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1"
+            value={selectedTemplateId}
+            onChange={e => applyTemplate(e.target.value)}
+          >
+            <option value="">— choose a template (optional) —</option>
+            {templates.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </label>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

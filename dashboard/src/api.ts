@@ -8,10 +8,10 @@
  */
 import {
   DEMO_DRIFT_REPORT, DEMO_GAP_REPORT, DEMO_PIPELINE_REPORT, DEMO_PROVIDERS, DEMO_QAIP_REPORT,
-  DEMO_SYNTHESIS_RESULT, DEMO_VERIFICATION_REPORT, DEMO_ZENTRAVIX_REPORT,
+  DEMO_SYNTHESIS_RESULT, DEMO_TEMPLATES, DEMO_VERIFICATION_REPORT, DEMO_ZENTRAVIX_REPORT,
 } from './demoData'
 import type {
-  DriftAnalysis, GapAnalysisReport, MultiAgentReport, ProvidersInfo, QAIPVerificationReport,
+  ContractTemplate, DriftAnalysis, GapAnalysisReport, MultiAgentReport, ProvidersInfo, QAIPVerificationReport,
   SynthesizedContractResult, TestResultsSummary, VerificationReport, ZentravixVerificationReport,
 } from './types'
 
@@ -36,6 +36,12 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 export async function fetchProviders(): Promise<ProvidersInfo> {
   if (DEMO_MODE) return demoDelay(DEMO_PROVIDERS)
   const resp = await fetch(`${API_URL}/providers`)
+  return resp.json()
+}
+
+export async function fetchTemplates(): Promise<ContractTemplate[]> {
+  if (DEMO_MODE) return demoDelay(DEMO_TEMPLATES)
+  const resp = await fetch(`${API_URL}/templates`)
   return resp.json()
 }
 

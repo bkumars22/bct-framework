@@ -43,6 +43,25 @@ class TestHealthAndProviders:
         assert set(resp.json()["supported"]) == {"groq", "anthropic"}
 
 
+class TestTemplates:
+    def test_returns_all_five_templates(self):
+        resp = client.get("/templates")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert {t["id"] for t in body} == {
+            "socratic_tutor", "customer_support", "medical_assistant", "legal_analyzer", "code_reviewer",
+        }
+
+    def test_each_template_has_full_contract_shape(self):
+        resp = client.get("/templates")
+        for t in resp.json():
+            assert t["name"]
+            assert t["system"]
+            assert t["always"]
+            assert t["never"]
+            assert 0.0 < t["threshold"] <= 1.0
+
+
 class TestAnalyzeGaps:
     def test_forced_simulation_returns_heuristic_report(self):
         resp = client.post("/analyze-gaps", json={

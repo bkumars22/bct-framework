@@ -1,3 +1,13 @@
+export interface ContractTemplate {
+  id: string
+  name: string
+  system: string
+  always: string[]
+  never: string[]
+  under_pressure: string[]
+  threshold: number
+}
+
 export interface VerificationReport {
   contract_name: string
   total_tests: number

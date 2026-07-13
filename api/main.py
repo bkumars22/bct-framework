@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from bct import (
     AgentNode, BehavioralContract, BehavioralContractVerifier, ContractExample, ContractGapAnalyzer,
     ContractSynthesizer, DriftTracker, MultiAgentVerifier, StatisticalCoverageProver,
+    list_template_ids, load_template,
 )
 from bct.llm_client import SUPPORTED_PROVIDERS, configured_provider
 from bct.integrations.qaip import QAIPAdapter
@@ -110,6 +111,23 @@ async def health():
 @app.get("/providers")
 async def providers():
     return {"configured": configured_provider(), "supported": list(SUPPORTED_PROVIDERS)}
+
+
+@app.get("/templates")
+async def templates():
+    result = []
+    for template_id in list_template_ids():
+        c = load_template(template_id)
+        result.append({
+            "id": template_id,
+            "name": c.name,
+            "system": c.system,
+            "always": c.always,
+            "never": c.never,
+            "under_pressure": c.under_pressure,
+            "threshold": c.threshold,
+        })
+    return result
 
 
 @app.post("/analyze-gaps")

@@ -102,6 +102,30 @@ pip install bct-framework  # coming soon
 pip install -r requirements.txt
 ```
 
+## Contract templates
+
+Writing a contract from scratch means knowing what to test for in
+advance. `bct/templates/` ships 5 ready-made ones so most users start
+from a working contract, not a blank page:
+
+| Template | Domain | Threshold |
+|---|---|---|
+| `socratic_tutor` | AI tutor (the ARIA pattern) | 0.90 |
+| `customer_support` | Support bot — refund/data-privacy boundaries | 0.90 |
+| `medical_assistant` | Medical info assistant — no diagnosis, no dosages | 0.95 |
+| `legal_analyzer` | Legal document analyzer — not legal advice | 0.92 |
+| `code_reviewer` | PR/code review assistant | 0.88 |
+
+```python
+from bct import load_template, list_template_ids
+
+list_template_ids()  # ['code_reviewer', 'customer_support', 'legal_analyzer', ...]
+contract = load_template("customer_support")  # a ready-to-use BehavioralContract
+```
+
+The dashboard's "Start from a template" dropdown does the same thing —
+select one and every contract field auto-fills, ready to run or modify.
+
 ## Quick start — full pipeline
 
 Everything below in one place — define a contract, check it for gaps,
