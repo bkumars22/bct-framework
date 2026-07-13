@@ -7,12 +7,12 @@
  * a real request would produce.
  */
 import {
-  DEMO_DRIFT_REPORT, DEMO_GAP_REPORT, DEMO_PIPELINE_REPORT, DEMO_PROVIDERS,
-  DEMO_SYNTHESIS_RESULT, DEMO_VERIFICATION_REPORT,
+  DEMO_DRIFT_REPORT, DEMO_GAP_REPORT, DEMO_PIPELINE_REPORT, DEMO_PROVIDERS, DEMO_QAIP_REPORT,
+  DEMO_SYNTHESIS_RESULT, DEMO_VERIFICATION_REPORT, DEMO_ZENTRAVIX_REPORT,
 } from './demoData'
 import type {
-  DriftAnalysis, GapAnalysisReport, MultiAgentReport, ProvidersInfo,
-  SynthesizedContractResult, TestResultsSummary, VerificationReport,
+  DriftAnalysis, GapAnalysisReport, MultiAgentReport, ProvidersInfo, QAIPVerificationReport,
+  SynthesizedContractResult, TestResultsSummary, VerificationReport, ZentravixVerificationReport,
 } from './types'
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8010'
@@ -94,6 +94,22 @@ export async function synthesizeContract(
 ): Promise<SynthesizedContractResult> {
   if (DEMO_MODE) return demoDelay(DEMO_SYNTHESIS_RESULT)
   return postJson<SynthesizedContractResult>('/synthesize-contract', { name, examples })
+}
+
+/**
+ * QAIP and ZENTRAVIX have no simulation mode of their own — their
+ * adapters always call a real endpoint — so in demo mode (GitHub Pages,
+ * no live QAIP/ZENTRAVIX instance to reach) these return an illustrative
+ * canned fixture instead, clearly not a claim about any real deployment.
+ */
+export async function verifyQaip(serviceUrl: string, aipqUrl?: string): Promise<QAIPVerificationReport> {
+  if (DEMO_MODE) return demoDelay(DEMO_QAIP_REPORT)
+  return postJson<QAIPVerificationReport>('/verify-qaip', { service_url: serviceUrl, aipq_url: aipqUrl || null })
+}
+
+export async function verifyZentravix(serviceUrl: string, aipqUrl?: string): Promise<ZentravixVerificationReport> {
+  if (DEMO_MODE) return demoDelay(DEMO_ZENTRAVIX_REPORT)
+  return postJson<ZentravixVerificationReport>('/verify-zentravix', { service_url: serviceUrl, aipq_url: aipqUrl || null })
 }
 
 /**

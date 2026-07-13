@@ -27,6 +27,8 @@ from bct import (
     ContractSynthesizer, DriftTracker, MultiAgentVerifier, StatisticalCoverageProver,
 )
 from bct.llm_client import SUPPORTED_PROVIDERS, configured_provider
+from bct.integrations.qaip import QAIPAdapter
+from bct.integrations.zentravix import ZENTRAVIXAdapter
 
 app = FastAPI(title="BCT API")
 
@@ -83,6 +85,12 @@ class SynthesizeRequest(BaseModel):
     name: str
     examples: List[ExampleRequest]
     threshold: float = 0.90
+    provider: Optional[str] = None
+
+
+class IntegrationRequest(BaseModel):
+    service_url: str
+    aipq_url: Optional[str] = None
     provider: Optional[str] = None
 
 
@@ -219,6 +227,71 @@ async def synthesize_contract(req: SynthesizeRequest):
             {"input_text": e.input_text, "response_text": e.response_text, "label": e.label, "note": e.note}
             for e in result.misclassified_examples
         ],
+    }
+
+
+@app.post("/verify-qaip")
+async def verify_qaip(req: IntegrationRequest):
+    adapter = QAIPAdapter(qaip_url=req.service_url, aipq_url=req.aipq_url, provider=req.provider)
+    try:
+        report = await adapter.verify()
+    except Exception as exc:
+        raise HTTPException(400, f"Could not verify QAIP at {req.service_url}: {exc}")
+    finally:
+        await adapter.aclose()
+
+    v = report.verification
+    return {
+        "contract_name": v.contract_name,
+        "total_tests": v.total_tests,
+        "passed_tests": v.passed_tests,
+        "overall_compliance": v.overall_compliance,
+        "compliance_by_intensity": v.compliance_by_intensity,
+        "compliance_by_category": v.compliance_by_category,
+        "breaking_point": v.breaking_point,
+        "weakest_category": v.weakest_category,
+        "threshold": v.threshold,
+        "result": v.result,
+        "p_value": _safe_float(v.p_value),
+        "effect_size": _safe_float(v.effect_size),
+        "confidence_interval": [_safe_float(v.confidence_interval[0]), _safe_float(v.confidence_interval[1])],
+        "recommendations": v.recommendations,
+        "violations": report.violations,
+        "sent_to_aipq": report.sent_to_aipq,
+        "aipq_error": report.aipq_error,
+    }
+
+
+@app.post("/verify-zentravix")
+async def verify_zentravix(req: IntegrationRequest):
+    adapter = ZENTRAVIXAdapter(zentravix_url=req.service_url, aipq_url=req.aipq_url, provider=req.provider)
+    try:
+        report = await adapter.verify()
+    except Exception as exc:
+        raise HTTPException(400, f"Could not verify ZENTRAVIX at {req.service_url}: {exc}")
+    finally:
+        await adapter.aclose()
+
+    v = report.verification
+    return {
+        "contract_name": v.contract_name,
+        "total_tests": v.total_tests,
+        "passed_tests": v.passed_tests,
+        "overall_compliance": v.overall_compliance,
+        "compliance_by_intensity": v.compliance_by_intensity,
+        "compliance_by_category": v.compliance_by_category,
+        "breaking_point": v.breaking_point,
+        "weakest_category": v.weakest_category,
+        "threshold": v.threshold,
+        "result": v.result,
+        "p_value": _safe_float(v.p_value),
+        "effect_size": _safe_float(v.effect_size),
+        "confidence_interval": [_safe_float(v.confidence_interval[0]), _safe_float(v.confidence_interval[1])],
+        "recommendations": v.recommendations,
+        "role_tested": report.role_tested,
+        "rbac_violations": report.rbac_violations,
+        "sent_to_aipq": report.sent_to_aipq,
+        "aipq_error": report.aipq_error,
     }
 
 

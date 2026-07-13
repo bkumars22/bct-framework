@@ -16,6 +16,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 import api.main as api_main  # noqa: E402
 from api.main import app  # noqa: E402
 from bct.generator import TestCase  # noqa: E402
+from bct.integrations.qaip import QAIPReport  # noqa: E402
+from bct.integrations.zentravix import ZENTRAVIXReport  # noqa: E402
+from bct.verifier import VerificationReport  # noqa: E402
 
 client = TestClient(app)
 
@@ -216,6 +219,62 @@ class TestVerify:
         ci = resp.json()["confidence_interval"]
         for bound in ci:
             assert bound is None or bound == bound  # NaN != NaN
+
+
+def _fake_verification_report(contract_name):
+    return VerificationReport(
+        contract_name=contract_name, total_tests=9, passed_tests=9, overall_compliance=1.0,
+        compliance_by_intensity={1: 1.0, 2: 1.0, 3: 1.0}, compliance_by_category={"AUTHORITY_BYPASS": 1.0},
+        breaking_point=None, weakest_category="AUTHORITY_BYPASS", threshold=0.92, result="✅ PASSED",
+        p_value=0.01, effect_size=1.2, confidence_interval=(0.9, 1.0), recommendations=["Contract held."],
+        mode="real", case_generation="integration",
+    )
+
+
+class TestVerifyQaip:
+    def test_returns_report_on_success(self):
+        fake_report = QAIPReport(
+            verification=_fake_verification_report("qaip_defect_explanation"),
+            violations=[], sent_to_aipq=False, aipq_error=None,
+        )
+        with patch("api.main.QAIPAdapter.verify", new=AsyncMock(return_value=fake_report)), \
+             patch("api.main.QAIPAdapter.aclose", new=AsyncMock()):
+            resp = client.post("/verify-qaip", json={"service_url": "http://localhost:8000"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["contract_name"] == "qaip_defect_explanation"
+        assert body["result"] == "✅ PASSED"
+        assert body["violations"] == []
+
+    def test_returns_400_when_qaip_unreachable(self):
+        with patch("api.main.QAIPAdapter.verify", new=AsyncMock(side_effect=ConnectionError("refused"))), \
+             patch("api.main.QAIPAdapter.aclose", new=AsyncMock()):
+            resp = client.post("/verify-qaip", json={"service_url": "http://localhost:9999"})
+        assert resp.status_code == 400
+        assert "Could not verify QAIP" in resp.json()["detail"]
+
+
+class TestVerifyZentravix:
+    def test_returns_report_on_success(self):
+        fake_report = ZENTRAVIXReport(
+            verification=_fake_verification_report("zentravix_ceo_query_rbac"),
+            role_tested="team_member", rbac_violations=[], sent_to_aipq=False, aipq_error=None,
+        )
+        with patch("api.main.ZENTRAVIXAdapter.verify", new=AsyncMock(return_value=fake_report)), \
+             patch("api.main.ZENTRAVIXAdapter.aclose", new=AsyncMock()):
+            resp = client.post("/verify-zentravix", json={"service_url": "http://localhost:8002"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["contract_name"] == "zentravix_ceo_query_rbac"
+        assert body["role_tested"] == "team_member"
+        assert body["rbac_violations"] == []
+
+    def test_returns_400_when_zentravix_unreachable(self):
+        with patch("api.main.ZENTRAVIXAdapter.verify", new=AsyncMock(side_effect=ConnectionError("refused"))), \
+             patch("api.main.ZENTRAVIXAdapter.aclose", new=AsyncMock()):
+            resp = client.post("/verify-zentravix", json={"service_url": "http://localhost:9999"})
+        assert resp.status_code == 400
+        assert "Could not verify ZENTRAVIX" in resp.json()["detail"]
 
 
 class TestDrift:

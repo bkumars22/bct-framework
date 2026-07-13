@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
   analyzeGaps, checkDrift as checkDriftApi, fetchProviders, synthesizeContract as synthesizeContractApi,
-  verifyContract, verifyPipeline,
+  verifyContract, verifyPipeline, verifyQaip, verifyZentravix,
 } from './api'
 import { Card } from './components'
 import TestResults from './TestResults'
 import type {
-  DriftAnalysis, GapAnalysisReport, GapFinding, MultiAgentReport,
-  ProvidersInfo, SynthesizedContractResult, VerificationReport,
+  DriftAnalysis, GapAnalysisReport, GapFinding, MultiAgentReport, ProvidersInfo,
+  QAIPVerificationReport, SynthesizedContractResult, VerificationReport, ZentravixVerificationReport,
 } from './types'
 
 const SEVERITY_ORDER: Record<GapFinding['severity'], number> = { critical: 0, warning: 1, info: 2 }
@@ -74,6 +74,18 @@ export default function App() {
   const [synthResult, setSynthResult] = useState<SynthesizedContractResult | null>(null)
   const [synthLoading, setSynthLoading] = useState(false)
   const [synthError, setSynthError] = useState<string | null>(null)
+
+  const [qaipUrl, setQaipUrl] = useState('http://localhost:8000')
+  const [qaipAipqUrl, setQaipAipqUrl] = useState('')
+  const [qaipReport, setQaipReport] = useState<QAIPVerificationReport | null>(null)
+  const [qaipLoading, setQaipLoading] = useState(false)
+  const [qaipError, setQaipError] = useState<string | null>(null)
+
+  const [zentravixUrl, setZentravixUrl] = useState('http://localhost:8002')
+  const [zentravixAipqUrl, setZentravixAipqUrl] = useState('')
+  const [zentravixReport, setZentravixReport] = useState<ZentravixVerificationReport | null>(null)
+  const [zentravixLoading, setZentravixLoading] = useState(false)
+  const [zentravixError, setZentravixError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchProviders().then(setProviders).catch(() => setProviders(null))
@@ -155,6 +167,44 @@ export default function App() {
       setSynthLoading(false)
     }
   }
+
+  async function runQaipVerification() {
+    setQaipLoading(true)
+    setQaipError(null)
+    setQaipReport(null)
+    try {
+      setQaipReport(await verifyQaip(qaipUrl, qaipAipqUrl || undefined))
+    } catch (err) {
+      setQaipError((err as Error).message)
+    } finally {
+      setQaipLoading(false)
+    }
+  }
+
+  async function runZentravixVerification() {
+    setZentravixLoading(true)
+    setZentravixError(null)
+    setZentravixReport(null)
+    try {
+      setZentravixReport(await verifyZentravix(zentravixUrl, zentravixAipqUrl || undefined))
+    } catch (err) {
+      setZentravixError((err as Error).message)
+    } finally {
+      setZentravixLoading(false)
+    }
+  }
+
+  const qaipCategoryData = qaipReport
+    ? Object.entries(qaipReport.compliance_by_category)
+        .sort(([, a], [, b]) => a - b)
+        .map(([category, score]) => ({ category, compliance: Math.round(score * 100), passes: score >= qaipReport.threshold }))
+    : []
+
+  const zentravixCategoryData = zentravixReport
+    ? Object.entries(zentravixReport.compliance_by_category)
+        .sort(([, a], [, b]) => a - b)
+        .map(([category, score]) => ({ category, compliance: Math.round(score * 100), passes: score >= zentravixReport.threshold }))
+    : []
 
   const intensityData = report
     ? Object.entries(report.compliance_by_intensity)
@@ -630,6 +680,167 @@ export default function App() {
             generalization guarantee. Run Verification above to test it against new adversarial cases.
           </p>
         </Card>
+      )}
+
+      <hr className="border-slate-800 my-8" />
+
+      <h2 className="text-xl font-bold mb-1">QAIP Integration Test</h2>
+      <p className="text-slate-400 text-sm mb-4">
+        Wraps QAIP's real defect-explanation endpoint (not a raw LLM prompt): pressures it with
+        DIRECT/POLITE/AUTHORITY/TECHNICAL pressure plus QAIP-specific CONTEXT failures
+        (empty/malformed/foreign-language/duplicate/oversized), and judges each real response
+        against the qaip_defect_explanation contract.
+      </p>
+      <Card title="QAIP Endpoint">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+          <label className="block">
+            <span className="text-slate-400">QAIP URL</span>
+            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipUrl} onChange={e => setQaipUrl(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
+            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipAipqUrl} onChange={e => setQaipAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
+          </label>
+        </div>
+        <button
+          onClick={runQaipVerification}
+          disabled={qaipLoading}
+          className="px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-sm font-medium"
+        >
+          {qaipLoading ? 'Testing QAIP (real calls take longer)…' : 'Run QAIP Verification'}
+        </button>
+      </Card>
+
+      {qaipError && <p className="text-red-400 text-sm mt-4">{qaipError}</p>}
+
+      {qaipReport && (
+        <div className="space-y-4 mt-4">
+          <Card title="QAIP Result">
+            <div className="flex items-center gap-4">
+              <span className="text-2xl font-bold">{qaipReport.result}</span>
+              <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-700 text-slate-300">
+                {qaipReport.sent_to_aipq ? 'SENT TO AIPQ' : qaipReport.aipq_error ? 'AIPQ PUSH FAILED' : 'AIPQ NOT CONFIGURED'}
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm mt-2">
+              Compliance: {(qaipReport.overall_compliance * 100).toFixed(1)}% (threshold {(qaipReport.threshold * 100).toFixed(0)}%) —{' '}
+              {qaipReport.passed_tests}/{qaipReport.total_tests} tests passed
+            </p>
+            <p className="text-slate-400 text-xs mt-2">Weakest category: {qaipReport.weakest_category}</p>
+          </Card>
+
+          <Card title="QAIP Compliance by Category">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-slate-400 text-left border-b border-slate-700">
+                  <th className="pb-1 pr-4">Category</th>
+                  <th className="pb-1">Compliance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {qaipCategoryData.map(c => (
+                  <tr key={c.category} className="border-b border-slate-800">
+                    <td className="py-1 pr-4">{c.category}</td>
+                    <td className={`py-1 font-semibold ${c.passes ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {c.passes ? '✅' : '❌'} {c.compliance}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {qaipReport.violations.length > 0 && (
+            <Card title="QAIP Violations">
+              <ul className="space-y-2 text-sm">
+                {qaipReport.violations.map((v, i) => (
+                  <li key={i} className="text-slate-300 text-xs font-mono border-b border-slate-800 pb-2">{v}</li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
+      )}
+
+      <hr className="border-slate-800 my-8" />
+
+      <h2 className="text-xl font-bold mb-1">ZENTRAVIX Integration Test</h2>
+      <p className="text-slate-400 text-sm mb-4">
+        Wraps ZENTRAVIX's real CEO query endpoint and tests role-based access control (RBAC)
+        boundaries specifically: authority claims bypassing RBAC, urgency claims demanding more
+        data, and technical injection attempting to disable RBAC outright.
+      </p>
+      <Card title="ZENTRAVIX Endpoint">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+          <label className="block">
+            <span className="text-slate-400">ZENTRAVIX URL</span>
+            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixUrl} onChange={e => setZentravixUrl(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
+            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixAipqUrl} onChange={e => setZentravixAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
+          </label>
+        </div>
+        <button
+          onClick={runZentravixVerification}
+          disabled={zentravixLoading}
+          className="px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-sm font-medium"
+        >
+          {zentravixLoading ? 'Testing ZENTRAVIX (real calls take longer)…' : 'Run ZENTRAVIX Verification'}
+        </button>
+      </Card>
+
+      {zentravixError && <p className="text-red-400 text-sm mt-4">{zentravixError}</p>}
+
+      {zentravixReport && (
+        <div className="space-y-4 mt-4">
+          <Card title="ZENTRAVIX Result">
+            <div className="flex items-center gap-4">
+              <span className="text-2xl font-bold">{zentravixReport.result}</span>
+              <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-700 text-slate-300">
+                {zentravixReport.sent_to_aipq ? 'SENT TO AIPQ' : zentravixReport.aipq_error ? 'AIPQ PUSH FAILED' : 'AIPQ NOT CONFIGURED'}
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm mt-2">
+              Compliance: {(zentravixReport.overall_compliance * 100).toFixed(1)}% (threshold {(zentravixReport.threshold * 100).toFixed(0)}%) —{' '}
+              {zentravixReport.passed_tests}/{zentravixReport.total_tests} tests passed
+            </p>
+            <p className="text-slate-400 text-xs mt-2">
+              Role tested: {zentravixReport.role_tested} · Weakest category: {zentravixReport.weakest_category}
+            </p>
+          </Card>
+
+          <Card title="ZENTRAVIX Compliance by Category">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-slate-400 text-left border-b border-slate-700">
+                  <th className="pb-1 pr-4">Category</th>
+                  <th className="pb-1">Compliance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {zentravixCategoryData.map(c => (
+                  <tr key={c.category} className="border-b border-slate-800">
+                    <td className="py-1 pr-4">{c.category}</td>
+                    <td className={`py-1 font-semibold ${c.passes ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {c.passes ? '✅' : '❌'} {c.compliance}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {zentravixReport.rbac_violations.length > 0 && (
+            <Card title="RBAC Violations">
+              <ul className="space-y-2 text-sm">
+                {zentravixReport.rbac_violations.map((v, i) => (
+                  <li key={i} className="text-slate-300 text-xs font-mono border-b border-slate-800 pb-2">{v}</li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
       )}
       </>)}
     </div>
