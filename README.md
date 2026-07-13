@@ -1,5 +1,10 @@
 # BCT — Behavioral Contract Testing Framework
 
+![Tests](https://img.shields.io/badge/tests-142%20passing-brightgreen)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Levels](https://img.shields.io/badge/BCT%20levels-10-purple)
+
 The first framework for testing whether a
 domain-specific AI maintains its behavioral
 contract under graduated adversarial pressure.
