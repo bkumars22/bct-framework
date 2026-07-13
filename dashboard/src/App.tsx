@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
-  analyzeGaps, checkDrift as checkDriftApi, fetchProviders, synthesizeContract as synthesizeContractApi,
+  analyzeGaps, checkDrift as checkDriftApi, DEMO_MODE, fetchProviders, synthesizeContract as synthesizeContractApi,
   verifyContract, verifyPipeline, verifyQaip, verifyZentravix,
 } from './api'
 import { Card } from './components'
@@ -717,22 +717,30 @@ export default function App() {
         against the qaip_defect_explanation contract.
       </p>
       <Card title="QAIP Endpoint">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
-          <label className="block">
-            <span className="text-slate-400">QAIP URL</span>
-            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipUrl} onChange={e => setQaipUrl(e.target.value)} />
-          </label>
-          <label className="block">
-            <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
-            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipAipqUrl} onChange={e => setQaipAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
-          </label>
-        </div>
+        {DEMO_MODE ? (
+          <p className="text-amber-400 text-xs mb-3">
+            Demo build — no live QAIP instance to reach here. Running this shows illustrative
+            results instead. Point your own dashboard build (VITE_API_URL set to a real backend) at
+            an actual QAIP deployment for a real result.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+            <label className="block">
+              <span className="text-slate-400">QAIP URL</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipUrl} onChange={e => setQaipUrl(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipAipqUrl} onChange={e => setQaipAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
+            </label>
+          </div>
+        )}
         <button
           onClick={runQaipVerification}
           disabled={qaipLoading}
           className="px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-sm font-medium"
         >
-          {qaipLoading ? 'Testing QAIP (real calls take longer)…' : 'Run QAIP Verification'}
+          {qaipLoading ? 'Testing QAIP…' : DEMO_MODE ? 'Show QAIP Demo Result' : 'Run QAIP Verification'}
         </button>
       </Card>
 
@@ -796,22 +804,30 @@ export default function App() {
         data, and technical injection attempting to disable RBAC outright.
       </p>
       <Card title="ZENTRAVIX Endpoint">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
-          <label className="block">
-            <span className="text-slate-400">ZENTRAVIX URL</span>
-            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixUrl} onChange={e => setZentravixUrl(e.target.value)} />
-          </label>
-          <label className="block">
-            <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
-            <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixAipqUrl} onChange={e => setZentravixAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
-          </label>
-        </div>
+        {DEMO_MODE ? (
+          <p className="text-amber-400 text-xs mb-3">
+            Demo build — no live ZENTRAVIX instance to reach here. Running this shows illustrative
+            results instead. Point your own dashboard build (VITE_API_URL set to a real backend) at
+            an actual ZENTRAVIX deployment for a real result.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+            <label className="block">
+              <span className="text-slate-400">ZENTRAVIX URL</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixUrl} onChange={e => setZentravixUrl(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixAipqUrl} onChange={e => setZentravixAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
+            </label>
+          </div>
+        )}
         <button
           onClick={runZentravixVerification}
           disabled={zentravixLoading}
           className="px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-sm font-medium"
         >
-          {zentravixLoading ? 'Testing ZENTRAVIX (real calls take longer)…' : 'Run ZENTRAVIX Verification'}
+          {zentravixLoading ? 'Testing ZENTRAVIX…' : DEMO_MODE ? 'Show ZENTRAVIX Demo Result' : 'Run ZENTRAVIX Verification'}
         </button>
       </Card>
 
