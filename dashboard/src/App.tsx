@@ -97,12 +97,16 @@ export default function App() {
 
   const [qaipUrl, setQaipUrl] = useState('http://localhost:8000')
   const [qaipAipqUrl, setQaipAipqUrl] = useState('')
+  const [qaipAipqPromptId, setQaipAipqPromptId] = useState('')
+  const [qaipAipqApiKey, setQaipAipqApiKey] = useState('')
   const [qaipReport, setQaipReport] = useState<QAIPVerificationReport | null>(null)
   const [qaipLoading, setQaipLoading] = useState(false)
   const [qaipError, setQaipError] = useState<string | null>(null)
 
   const [zentravixUrl, setZentravixUrl] = useState('http://localhost:8002')
   const [zentravixAipqUrl, setZentravixAipqUrl] = useState('')
+  const [zentravixAipqPromptId, setZentravixAipqPromptId] = useState('')
+  const [zentravixAipqApiKey, setZentravixAipqApiKey] = useState('')
   const [zentravixReport, setZentravixReport] = useState<ZentravixVerificationReport | null>(null)
   const [zentravixLoading, setZentravixLoading] = useState(false)
   const [zentravixError, setZentravixError] = useState<string | null>(null)
@@ -206,7 +210,11 @@ export default function App() {
     setQaipError(null)
     setQaipReport(null)
     try {
-      setQaipReport(await verifyQaip(qaipUrl, qaipAipqUrl || undefined))
+      setQaipReport(await verifyQaip(qaipUrl, {
+        aipqUrl: qaipAipqUrl || undefined,
+        aipqPromptId: qaipAipqPromptId ? Number(qaipAipqPromptId) : undefined,
+        aipqApiKey: qaipAipqApiKey || undefined,
+      }))
     } catch (err) {
       setQaipError((err as Error).message)
     } finally {
@@ -219,7 +227,11 @@ export default function App() {
     setZentravixError(null)
     setZentravixReport(null)
     try {
-      setZentravixReport(await verifyZentravix(zentravixUrl, zentravixAipqUrl || undefined))
+      setZentravixReport(await verifyZentravix(zentravixUrl, {
+        aipqUrl: zentravixAipqUrl || undefined,
+        aipqPromptId: zentravixAipqPromptId ? Number(zentravixAipqPromptId) : undefined,
+        aipqApiKey: zentravixAipqApiKey || undefined,
+      }))
     } catch (err) {
       setZentravixError((err as Error).message)
     } finally {
@@ -764,6 +776,14 @@ export default function App() {
               <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
               <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipAipqUrl} onChange={e => setQaipAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
             </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ prompt ID</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipAipqPromptId} onChange={e => setQaipAipqPromptId(e.target.value)} placeholder="e.g. 4 — required for the push to succeed" />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ API key</span>
+              <input type="password" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={qaipAipqApiKey} onChange={e => setQaipAipqApiKey(e.target.value)} placeholder="aipq_..." />
+            </label>
           </div>
         )}
         <button
@@ -850,6 +870,14 @@ export default function App() {
             <label className="block">
               <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
               <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixAipqUrl} onChange={e => setZentravixAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ prompt ID</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixAipqPromptId} onChange={e => setZentravixAipqPromptId(e.target.value)} placeholder="e.g. 4 — required for the push to succeed" />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ API key</span>
+              <input type="password" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={zentravixAipqApiKey} onChange={e => setZentravixAipqApiKey(e.target.value)} placeholder="aipq_..." />
             </label>
           </div>
         )}

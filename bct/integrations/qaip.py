@@ -206,11 +206,15 @@ class QAIPAdapter:
         self,
         qaip_url: str,
         aipq_url: Optional[str] = None,
+        aipq_prompt_id: Optional[int] = None,
+        aipq_api_key: Optional[str] = None,
         provider: Optional[str] = None,
         http_client: Optional[httpx.AsyncClient] = None,
     ):
         self.qaip_url = qaip_url.rstrip("/")
         self.aipq_url = aipq_url.rstrip("/") if aipq_url else None
+        self.aipq_prompt_id = aipq_prompt_id
+        self.aipq_api_key = aipq_api_key
         self.provider = provider
         self._client = http_client
         self._owns_client = http_client is None
@@ -285,8 +289,10 @@ class QAIPAdapter:
 
         sent_to_aipq = False
         aipq_error = None
-        if self.aipq_url:
+        if self.aipq_url and self.aipq_prompt_id:
             sent_to_aipq, aipq_error = await self._send_to_aipq(verification)
+        elif self.aipq_url and not self.aipq_prompt_id:
+            aipq_error = "aipq_url was set but aipq_prompt_id was not — AIPQ's endpoint is scoped per prompt"
 
         return QAIPReport(
             verification=verification,
@@ -346,21 +352,25 @@ class QAIPAdapter:
 
     async def _send_to_aipq(self, verification: VerificationReport) -> Tuple[bool, Optional[str]]:
         """
-        Best-effort push of this result to AIPQ for prompt-version quality
-        tracking. Not fatal if AIPQ is unreachable or its endpoint doesn't
-        match this shape — a failed push is reported on QAIPReport, not
-        raised, since QAIP's own verification result is still valid either way.
+        Best-effort push of this result to AIPQ's POST /prompts/{prompt_id}/
+        bct-result for prompt-version quality tracking. Not fatal if AIPQ is
+        unreachable, the prompt/credential is wrong, or anything else fails
+        — a failed push is reported on QAIPReport, not raised, since QAIP's
+        own verification result is still valid either way.
         """
         client = self._get_client()
+        headers = {"Authorization": f"Bearer {self.aipq_api_key}"} if self.aipq_api_key else {}
         try:
             resp = await client.post(
-                f"{self.aipq_url}/prompts/versions/bct-result",
+                f"{self.aipq_url}/prompts/{self.aipq_prompt_id}/bct-result",
                 json={
+                    "source_system": "qaip",
                     "contract_name": verification.contract_name,
                     "overall_compliance": verification.overall_compliance,
                     "breaking_point": verification.breaking_point,
                     "result": verification.result,
                 },
+                headers=headers,
             )
             resp.raise_for_status()
             return True, None

@@ -114,7 +114,10 @@ class TestVerify:
     @pytest.mark.asyncio
     async def test_sends_result_to_aipq_when_configured(self, monkeypatch):
         client = _mock_client(lambda *a, **kw: _ok_response({"explanation": "P3: insufficient context (confidence: LOW)"}))
-        adapter = QAIPAdapter(qaip_url="http://localhost:8000", aipq_url="http://localhost:8001", http_client=client)
+        adapter = QAIPAdapter(
+            qaip_url="http://localhost:8000", aipq_url="http://localhost:8001",
+            aipq_prompt_id=4, aipq_api_key="aipq_test_key", http_client=client,
+        )
         monkeypatch.setattr(
             "bct.integrations.qaip.judge_compliance",
             AsyncMock(return_value=(True, "complied: true")),
@@ -124,19 +127,24 @@ class TestVerify:
 
         assert report.sent_to_aipq is True
         assert report.aipq_error is None
-        aipq_calls = [c for c in client.post.call_args_list if "prompts/versions/bct-result" in c.args[0]]
+        aipq_calls = [c for c in client.post.call_args_list if "/prompts/4/bct-result" in c.args[0]]
         assert len(aipq_calls) == 1
+        assert aipq_calls[0].kwargs["json"]["source_system"] == "qaip"
+        assert aipq_calls[0].kwargs["headers"]["Authorization"] == "Bearer aipq_test_key"
 
     @pytest.mark.asyncio
     async def test_aipq_push_failure_is_non_fatal(self, monkeypatch):
-        async def post_side_effect(url, json=None):
-            if "prompts/versions/bct-result" in url:
+        async def post_side_effect(url, json=None, headers=None):
+            if "/prompts/4/bct-result" in url:
                 raise ConnectionError("AIPQ unreachable")
             return _ok_response({"explanation": "P3: insufficient context (confidence: LOW)"})
 
         client = MagicMock()
         client.post = AsyncMock(side_effect=post_side_effect)
-        adapter = QAIPAdapter(qaip_url="http://localhost:8000", aipq_url="http://localhost:8001", http_client=client)
+        adapter = QAIPAdapter(
+            qaip_url="http://localhost:8000", aipq_url="http://localhost:8001",
+            aipq_prompt_id=4, http_client=client,
+        )
         monkeypatch.setattr(
             "bct.integrations.qaip.judge_compliance",
             AsyncMock(return_value=(True, "complied: true")),
@@ -147,3 +155,19 @@ class TestVerify:
         assert report.sent_to_aipq is False
         assert "AIPQ unreachable" in report.aipq_error
         assert report.contract_holds is True  # QAIP's own result is unaffected
+
+    @pytest.mark.asyncio
+    async def test_aipq_url_without_prompt_id_is_reported_not_attempted(self, monkeypatch):
+        client = _mock_client(lambda *a, **kw: _ok_response({"explanation": "P3: insufficient context (confidence: LOW)"}))
+        adapter = QAIPAdapter(qaip_url="http://localhost:8000", aipq_url="http://localhost:8001", http_client=client)
+        monkeypatch.setattr(
+            "bct.integrations.qaip.judge_compliance",
+            AsyncMock(return_value=(True, "complied: true")),
+        )
+
+        report = await adapter.verify()
+
+        assert report.sent_to_aipq is False
+        assert "aipq_prompt_id" in report.aipq_error
+        aipq_calls = [c for c in client.post.call_args_list if "bct-result" in c.args[0]]
+        assert aipq_calls == []  # never even attempted the push

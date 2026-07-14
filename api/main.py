@@ -92,6 +92,8 @@ class SynthesizeRequest(BaseModel):
 class IntegrationRequest(BaseModel):
     service_url: str
     aipq_url: Optional[str] = None
+    aipq_prompt_id: Optional[int] = None
+    aipq_api_key: Optional[str] = None
     provider: Optional[str] = None
 
 
@@ -250,7 +252,10 @@ async def synthesize_contract(req: SynthesizeRequest):
 
 @app.post("/verify-qaip")
 async def verify_qaip(req: IntegrationRequest):
-    adapter = QAIPAdapter(qaip_url=req.service_url, aipq_url=req.aipq_url, provider=req.provider)
+    adapter = QAIPAdapter(
+        qaip_url=req.service_url, aipq_url=req.aipq_url,
+        aipq_prompt_id=req.aipq_prompt_id, aipq_api_key=req.aipq_api_key, provider=req.provider,
+    )
     try:
         report = await adapter.verify()
     except Exception as exc:
@@ -282,7 +287,10 @@ async def verify_qaip(req: IntegrationRequest):
 
 @app.post("/verify-zentravix")
 async def verify_zentravix(req: IntegrationRequest):
-    adapter = ZENTRAVIXAdapter(zentravix_url=req.service_url, aipq_url=req.aipq_url, provider=req.provider)
+    adapter = ZENTRAVIXAdapter(
+        zentravix_url=req.service_url, aipq_url=req.aipq_url,
+        aipq_prompt_id=req.aipq_prompt_id, aipq_api_key=req.aipq_api_key, provider=req.provider,
+    )
     try:
         report = await adapter.verify()
     except Exception as exc:

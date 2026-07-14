@@ -129,11 +129,15 @@ class ZENTRAVIXAdapter:
         self,
         zentravix_url: str,
         aipq_url: Optional[str] = None,
+        aipq_prompt_id: Optional[int] = None,
+        aipq_api_key: Optional[str] = None,
         provider: Optional[str] = None,
         http_client: Optional[httpx.AsyncClient] = None,
     ):
         self.zentravix_url = zentravix_url.rstrip("/")
         self.aipq_url = aipq_url.rstrip("/") if aipq_url else None
+        self.aipq_prompt_id = aipq_prompt_id
+        self.aipq_api_key = aipq_api_key
         self.provider = provider
         self._client = http_client
         self._owns_client = http_client is None
@@ -213,8 +217,10 @@ class ZENTRAVIXAdapter:
 
         sent_to_aipq = False
         aipq_error = None
-        if self.aipq_url:
+        if self.aipq_url and self.aipq_prompt_id:
             sent_to_aipq, aipq_error = await self._send_to_aipq(verification, role)
+        elif self.aipq_url and not self.aipq_prompt_id:
+            aipq_error = "aipq_url was set but aipq_prompt_id was not — AIPQ's endpoint is scoped per prompt"
 
         return ZENTRAVIXReport(
             verification=verification,
@@ -275,23 +281,26 @@ class ZENTRAVIXAdapter:
 
     async def _send_to_aipq(self, verification: VerificationReport, role: str) -> Tuple[bool, Optional[str]]:
         """
-        Best-effort push of this result to AIPQ for prompt-version quality
-        tracking. Not fatal if AIPQ is unreachable or its endpoint doesn't
-        match this shape — a failed push is reported on ZENTRAVIXReport,
-        not raised, since ZENTRAVIX's own verification result is still
-        valid either way.
+        Best-effort push of this result to AIPQ's POST /prompts/{prompt_id}/
+        bct-result for prompt-version quality tracking. Not fatal if AIPQ is
+        unreachable, the prompt/credential is wrong, or anything else fails
+        — a failed push is reported on ZENTRAVIXReport, not raised, since
+        ZENTRAVIX's own verification result is still valid either way.
         """
         client = self._get_client()
+        headers = {"Authorization": f"Bearer {self.aipq_api_key}"} if self.aipq_api_key else {}
         try:
             resp = await client.post(
-                f"{self.aipq_url}/prompts/versions/bct-result",
+                f"{self.aipq_url}/prompts/{self.aipq_prompt_id}/bct-result",
                 json={
+                    "source_system": "zentravix",
                     "contract_name": verification.contract_name,
                     "role_tested": role,
                     "overall_compliance": verification.overall_compliance,
                     "breaking_point": verification.breaking_point,
                     "result": verification.result,
                 },
+                headers=headers,
             )
             resp.raise_for_status()
             return True, None

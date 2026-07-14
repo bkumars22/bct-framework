@@ -108,14 +108,26 @@ export async function synthesizeContract(
  * no live QAIP/ZENTRAVIX instance to reach) these return an illustrative
  * canned fixture instead, clearly not a claim about any real deployment.
  */
-export async function verifyQaip(serviceUrl: string, aipqUrl?: string): Promise<QAIPVerificationReport> {
-  if (DEMO_MODE) return demoDelay(DEMO_QAIP_REPORT)
-  return postJson<QAIPVerificationReport>('/verify-qaip', { service_url: serviceUrl, aipq_url: aipqUrl || null })
+export interface AipqTrackingOptions {
+  aipqUrl?: string
+  aipqPromptId?: number
+  aipqApiKey?: string
 }
 
-export async function verifyZentravix(serviceUrl: string, aipqUrl?: string): Promise<ZentravixVerificationReport> {
+export async function verifyQaip(serviceUrl: string, aipq?: AipqTrackingOptions): Promise<QAIPVerificationReport> {
+  if (DEMO_MODE) return demoDelay(DEMO_QAIP_REPORT)
+  return postJson<QAIPVerificationReport>('/verify-qaip', {
+    service_url: serviceUrl, aipq_url: aipq?.aipqUrl || null,
+    aipq_prompt_id: aipq?.aipqPromptId || null, aipq_api_key: aipq?.aipqApiKey || null,
+  })
+}
+
+export async function verifyZentravix(serviceUrl: string, aipq?: AipqTrackingOptions): Promise<ZentravixVerificationReport> {
   if (DEMO_MODE) return demoDelay(DEMO_ZENTRAVIX_REPORT)
-  return postJson<ZentravixVerificationReport>('/verify-zentravix', { service_url: serviceUrl, aipq_url: aipqUrl || null })
+  return postJson<ZentravixVerificationReport>('/verify-zentravix', {
+    service_url: serviceUrl, aipq_url: aipq?.aipqUrl || null,
+    aipq_prompt_id: aipq?.aipqPromptId || null, aipq_api_key: aipq?.aipqApiKey || null,
+  })
 }
 
 /**
