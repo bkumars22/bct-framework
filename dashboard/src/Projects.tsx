@@ -3,7 +3,7 @@ import { Card } from './components'
 interface ProjectInfo {
   name: string
   whatBctTests: string
-  status: 'wired' | 'not_connected'
+  status: 'wired' | 'receiver' | 'not_connected'
   sectionId?: string
 }
 
@@ -24,19 +24,23 @@ const PROJECTS: ProjectInfo[] = [
   },
   {
     name: 'AIPQ',
-    whatBctTests: 'Receives BCT verification results for prompt-version quality tracking (best-effort push from '
-      + 'the QAIP and ZENTRAVIX adapters) — not itself tested by BCT yet.',
-    status: 'not_connected',
+    whatBctTests: 'Receives BCT verification results via POST /prompts/{id}/bct-result for prompt-version quality '
+      + 'tracking (fill in an AIPQ prompt ID + API key on the QAIP/ZENTRAVIX panels) — verified working against a '
+      + 'real AIPQ deployment. Not itself tested by BCT; it only receives results, doesn\'t generate them.',
+    status: 'receiver',
   },
   {
     name: 'ARIA',
-    whatBctTests: 'The Socratic-teaching contract used throughout BCT\'s own demo data is modeled on ARIA, but '
-      + 'there is no bct/integrations/aria.py wired to a live ARIA endpoint yet.',
+    whatBctTests: 'Has a real chat endpoint (POST /api/sessions/{id}/chat), but it\'s session-based — a session '
+      + 'must be created first via POST /api/sessions — unlike QAIP/ZENTRAVIX\'s single stateless call. '
+      + 'No bct/integrations/aria.py yet; the session lifecycle is the reason it\'s more work than the other two.',
     status: 'not_connected',
   },
   {
     name: 'AIMO',
-    whatBctTests: 'Not yet connected.',
+    whatBctTests: 'No equivalent endpoint exists yet — its API is pipeline/incident CRUD and monitoring, not a '
+      + '"send a question, get an LLM-generated answer" endpoint BCT could adversarially test. Needs a new '
+      + 'endpoint on AIMO\'s side (e.g. an incident-explanation route) before an adapter can be built here.',
     status: 'not_connected',
   },
 ]
@@ -56,9 +60,11 @@ export default function Projects({ onGoToSection }: { onGoToSection: (sectionId:
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                p.status === 'wired' ? 'bg-emerald-900/40 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                p.status === 'wired' ? 'bg-emerald-900/40 text-emerald-400'
+                  : p.status === 'receiver' ? 'bg-sky-900/40 text-sky-400'
+                    : 'bg-slate-700 text-slate-400'
               }`}>
-                {p.status === 'wired' ? 'WIRED' : 'NOT CONNECTED'}
+                {p.status === 'wired' ? 'WIRED' : p.status === 'receiver' ? 'RECEIVES RESULTS' : 'NOT CONNECTED'}
               </span>
               <p className="text-slate-300 text-sm mt-2">{p.whatBctTests}</p>
             </div>
