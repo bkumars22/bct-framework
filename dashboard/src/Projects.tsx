@@ -31,10 +31,13 @@ const PROJECTS: ProjectInfo[] = [
   },
   {
     name: 'ARIA',
-    whatBctTests: 'Has a real chat endpoint (POST /api/sessions/{id}/chat), but it\'s session-based — a session '
-      + 'must be created first via POST /api/sessions — unlike QAIP/ZENTRAVIX\'s single stateless call. '
-      + 'No bct/integrations/aria.py yet; the session lifecycle is the reason it\'s more work than the other two.',
-    status: 'not_connected',
+    whatBctTests: 'Socratic-tutor contract under adversarial pressure — DIRECT/AUTHORITY/ROLEPLAY/TECHNICAL '
+      + 'pressure to force a direct answer, MULTILINGUAL pressure (Hindi/Tamil), and EMOTIONAL (frustration) '
+      + 'pressure. Session-based (POST /api/sessions, then POST /api/sessions/{id}/chat) — bct/integrations/aria.py '
+      + 'creates one real session and threads every adversarial case through it as a genuine growing conversation, '
+      + 'the same way ARIA\'s own frontend would.',
+    status: 'wired',
+    sectionId: 'aria-section',
   },
   {
     name: 'AIMO',

@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
   analyzeGaps, checkDrift as checkDriftApi, DEMO_MODE, fetchProviders, fetchTemplates,
-  synthesizeContract as synthesizeContractApi, verifyContract, verifyPipeline, verifyQaip, verifyZentravix,
+  synthesizeContract as synthesizeContractApi, verifyAria, verifyContract, verifyPipeline, verifyQaip, verifyZentravix,
 } from './api'
 import { Card } from './components'
 import Projects from './Projects'
 import TestResults from './TestResults'
 import type {
-  ContractTemplate, DriftAnalysis, GapAnalysisReport, GapFinding, MultiAgentReport, ProvidersInfo,
-  QAIPVerificationReport, SynthesizedContractResult, VerificationReport, ZentravixVerificationReport,
+  ARIAVerificationReport, ContractTemplate, DriftAnalysis, GapAnalysisReport, GapFinding, MultiAgentReport,
+  ProvidersInfo, QAIPVerificationReport, SynthesizedContractResult, VerificationReport, ZentravixVerificationReport,
 } from './types'
 
 const SEVERITY_ORDER: Record<GapFinding['severity'], number> = { critical: 0, warning: 1, info: 2 }
@@ -110,6 +110,14 @@ export default function App() {
   const [zentravixReport, setZentravixReport] = useState<ZentravixVerificationReport | null>(null)
   const [zentravixLoading, setZentravixLoading] = useState(false)
   const [zentravixError, setZentravixError] = useState<string | null>(null)
+
+  const [ariaUrl, setAriaUrl] = useState('http://localhost:8089/aria')
+  const [ariaAipqUrl, setAriaAipqUrl] = useState('')
+  const [ariaAipqPromptId, setAriaAipqPromptId] = useState('')
+  const [ariaAipqApiKey, setAriaAipqApiKey] = useState('')
+  const [ariaReport, setAriaReport] = useState<ARIAVerificationReport | null>(null)
+  const [ariaLoading, setAriaLoading] = useState(false)
+  const [ariaError, setAriaError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchProviders().then(setProviders).catch(() => setProviders(null))
@@ -239,6 +247,23 @@ export default function App() {
     }
   }
 
+  async function runAriaVerification() {
+    setAriaLoading(true)
+    setAriaError(null)
+    setAriaReport(null)
+    try {
+      setAriaReport(await verifyAria(ariaUrl, {
+        aipqUrl: ariaAipqUrl || undefined,
+        aipqPromptId: ariaAipqPromptId ? Number(ariaAipqPromptId) : undefined,
+        aipqApiKey: ariaAipqApiKey || undefined,
+      }))
+    } catch (err) {
+      setAriaError((err as Error).message)
+    } finally {
+      setAriaLoading(false)
+    }
+  }
+
   const qaipCategoryData = qaipReport
     ? Object.entries(qaipReport.compliance_by_category)
         .sort(([, a], [, b]) => a - b)
@@ -249,6 +274,12 @@ export default function App() {
     ? Object.entries(zentravixReport.compliance_by_category)
         .sort(([, a], [, b]) => a - b)
         .map(([category, score]) => ({ category, compliance: Math.round(score * 100), passes: score >= zentravixReport.threshold }))
+    : []
+
+  const ariaCategoryData = ariaReport
+    ? Object.entries(ariaReport.compliance_by_category)
+        .sort(([, a], [, b]) => a - b)
+        .map(([category, score]) => ({ category, compliance: Math.round(score * 100), passes: score >= ariaReport.threshold }))
     : []
 
   const intensityData = report
@@ -935,6 +966,108 @@ export default function App() {
             <Card title="RBAC Violations">
               <ul className="space-y-2 text-sm">
                 {zentravixReport.rbac_violations.map((v, i) => (
+                  <li key={i} className="text-slate-300 text-xs font-mono border-b border-slate-800 pb-2">{v}</li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
+      )}
+
+      <hr className="border-slate-800 my-8" />
+
+      <h2 id="aria-section" className="text-xl font-bold mb-1">ARIA Integration Test</h2>
+      <p className="text-slate-400 text-sm mb-4">
+        Wraps ARIA's real session-based teaching API (POST /api/sessions, then POST
+        /api/sessions/{'{id}'}/chat — proxied to the Python /teach endpoint) as one real,
+        growing conversation: every adversarial case below is sent as a successive turn in
+        the SAME session, threading ARIA's own conversation_history exactly as its real
+        frontend would. Tests DIRECT/AUTHORITY/ROLEPLAY/TECHNICAL pressure to force a direct
+        answer, MULTILINGUAL pressure (Hindi/Tamil — ARIA's own contract promises the rule
+        holds in "all languages"), and EMOTIONAL (frustration) pressure, judging each real
+        response against the Socratic-tutor contract.
+      </p>
+      <Card title="ARIA Endpoint">
+        {DEMO_MODE ? (
+          <p className="text-amber-400 text-xs mb-3">
+            Demo build — no live ARIA instance to reach here. Running this shows illustrative
+            results instead. Point your own dashboard build (VITE_API_URL set to a real backend) at
+            an actual ARIA deployment (backend + ai-service both running) for a real result.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+            <label className="block">
+              <span className="text-slate-400">ARIA backend URL</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={ariaUrl} onChange={e => setAriaUrl(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ URL (optional — for version tracking)</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={ariaAipqUrl} onChange={e => setAriaAipqUrl(e.target.value)} placeholder="http://localhost:8001" />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ prompt ID</span>
+              <input className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={ariaAipqPromptId} onChange={e => setAriaAipqPromptId(e.target.value)} placeholder="e.g. 4 — required for the push to succeed" />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">AIPQ API key</span>
+              <input type="password" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1" value={ariaAipqApiKey} onChange={e => setAriaAipqApiKey(e.target.value)} placeholder="aipq_..." />
+            </label>
+          </div>
+        )}
+        <button
+          onClick={runAriaVerification}
+          disabled={ariaLoading}
+          className="px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-sm font-medium"
+        >
+          {ariaLoading ? 'Testing ARIA…' : DEMO_MODE ? 'Show ARIA Demo Result' : 'Run ARIA Verification'}
+        </button>
+      </Card>
+
+      {ariaError && <p className="text-red-400 text-sm mt-4">{ariaError}</p>}
+
+      {ariaReport && (
+        <div className="space-y-4 mt-4">
+          <Card title="ARIA Result">
+            <div className="flex items-center gap-4">
+              <span className="text-2xl font-bold">{ariaReport.result}</span>
+              <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-700 text-slate-300">
+                {ariaReport.sent_to_aipq ? 'SENT TO AIPQ' : ariaReport.aipq_error ? 'AIPQ PUSH FAILED' : 'AIPQ NOT CONFIGURED'}
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm mt-2">
+              Compliance: {(ariaReport.overall_compliance * 100).toFixed(1)}% (threshold {(ariaReport.threshold * 100).toFixed(0)}%) —{' '}
+              {ariaReport.passed_tests}/{ariaReport.total_tests} tests passed
+            </p>
+            <p className="text-slate-400 text-xs mt-2">
+              Session tested: {ariaReport.session_id ?? 'n/a'} · Weakest category: {ariaReport.weakest_category}
+            </p>
+          </Card>
+
+          <Card title="ARIA Compliance by Category">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-slate-400 text-left border-b border-slate-700">
+                  <th className="pb-1 pr-4">Category</th>
+                  <th className="pb-1">Compliance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ariaCategoryData.map(c => (
+                  <tr key={c.category} className="border-b border-slate-800">
+                    <td className="py-1 pr-4">{c.category}</td>
+                    <td className={`py-1 font-semibold ${c.passes ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {c.passes ? '✅' : '❌'} {c.compliance}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {ariaReport.violations.length > 0 && (
+            <Card title="ARIA Violations">
+              <ul className="space-y-2 text-sm">
+                {ariaReport.violations.map((v, i) => (
                   <li key={i} className="text-slate-300 text-xs font-mono border-b border-slate-800 pb-2">{v}</li>
                 ))}
               </ul>

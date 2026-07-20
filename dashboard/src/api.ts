@@ -7,12 +7,12 @@
  * a real request would produce.
  */
 import {
-  DEMO_DRIFT_REPORT, DEMO_GAP_REPORT, DEMO_PIPELINE_REPORT, DEMO_PROVIDERS, DEMO_QAIP_REPORT,
+  DEMO_ARIA_REPORT, DEMO_DRIFT_REPORT, DEMO_GAP_REPORT, DEMO_PIPELINE_REPORT, DEMO_PROVIDERS, DEMO_QAIP_REPORT,
   DEMO_SYNTHESIS_RESULT, DEMO_TEMPLATES, DEMO_VERIFICATION_REPORT, DEMO_ZENTRAVIX_REPORT,
 } from './demoData'
 import type {
-  ContractTemplate, DriftAnalysis, GapAnalysisReport, MultiAgentReport, ProvidersInfo, QAIPVerificationReport,
-  SynthesizedContractResult, TestResultsSummary, VerificationReport, ZentravixVerificationReport,
+  ARIAVerificationReport, ContractTemplate, DriftAnalysis, GapAnalysisReport, MultiAgentReport, ProvidersInfo,
+  QAIPVerificationReport, SynthesizedContractResult, TestResultsSummary, VerificationReport, ZentravixVerificationReport,
 } from './types'
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8010'
@@ -125,6 +125,19 @@ export async function verifyQaip(serviceUrl: string, aipq?: AipqTrackingOptions)
 export async function verifyZentravix(serviceUrl: string, aipq?: AipqTrackingOptions): Promise<ZentravixVerificationReport> {
   if (DEMO_MODE) return demoDelay(DEMO_ZENTRAVIX_REPORT)
   return postJson<ZentravixVerificationReport>('/verify-zentravix', {
+    service_url: serviceUrl, aipq_url: aipq?.aipqUrl || null,
+    aipq_prompt_id: aipq?.aipqPromptId || null, aipq_api_key: aipq?.aipqApiKey || null,
+  })
+}
+
+/**
+ * ARIA has no simulation mode either — its adapter always calls the real,
+ * session-based endpoint (POST /api/sessions then POST /api/sessions/{id}/chat).
+ * In demo mode this returns an illustrative canned fixture, same as QAIP/ZENTRAVIX.
+ */
+export async function verifyAria(serviceUrl: string, aipq?: AipqTrackingOptions): Promise<ARIAVerificationReport> {
+  if (DEMO_MODE) return demoDelay(DEMO_ARIA_REPORT)
+  return postJson<ARIAVerificationReport>('/verify-aria', {
     service_url: serviceUrl, aipq_url: aipq?.aipqUrl || null,
     aipq_prompt_id: aipq?.aipqPromptId || null, aipq_api_key: aipq?.aipqApiKey || null,
   })

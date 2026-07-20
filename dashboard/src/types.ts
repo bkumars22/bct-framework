@@ -164,6 +164,27 @@ export interface ZentravixVerificationReport {
   aipq_error: string | null
 }
 
+export interface ARIAVerificationReport {
+  contract_name: string
+  total_tests: number
+  passed_tests: number
+  overall_compliance: number
+  compliance_by_intensity: Record<string, number>
+  compliance_by_category: Record<string, number>
+  breaking_point: number | null
+  weakest_category: string
+  threshold: number
+  result: string
+  p_value: number | null
+  effect_size: number | null
+  confidence_interval: [number | null, number | null]
+  recommendations: string[]
+  session_id: number | null
+  violations: string[]
+  sent_to_aipq: boolean
+  aipq_error: string | null
+}
+
 export interface TestCaseResult {
   nodeid: string
   outcome: 'passed' | 'failed' | 'skipped' | 'error'
