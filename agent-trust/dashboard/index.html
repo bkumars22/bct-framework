@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgentTrust</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #131a23;
+    --panel-border: #232c38;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --accent: #0096D6;
+    --green: #2ecc71;
+    --orange: #f0a020;
+    --red: #e5484d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    letter-spacing: 0.2px;
+  }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  main { padding: 24px 32px 48px; max-width: 1180px; margin: 0 auto; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat .value { font-size: 26px; font-weight: 600; }
+  .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .stat.healthy .value { color: var(--green); }
+  .stat.warning .value { color: var(--orange); }
+  .stat.critical .value { color: var(--red); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .panel h2 {
+    margin: 0;
+    padding: 14px 18px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--panel-border);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 12px 18px; text-align: left; font-size: 14px; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+  tbody tr { cursor: pointer; border-top: 1px solid var(--panel-border); }
+  tbody tr:hover { background: #182230; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .badge.green { background: rgba(46,204,113,0.15); color: var(--green); }
+  .badge.orange { background: rgba(240,160,32,0.15); color: var(--orange); }
+  .badge.red { background: rgba(229,72,77,0.15); color: var(--red); }
+  .gap-red { color: var(--red); font-weight: 600; }
+  .gap-orange { color: var(--orange); font-weight: 600; }
+  .gap-green { color: var(--green); font-weight: 600; }
+
+  .detail { display: none; }
+  .detail.open { display: block; }
+  .detail-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; padding: 18px; }
+  .curve-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .curve-row .lvl { width: 60px; color: var(--muted); }
+  .curve-track { flex: 1; height: 14px; background: #0d1218; border-radius: 4px; overflow: hidden; position: relative; }
+  .curve-fill { height: 100%; background: var(--accent); }
+  .curve-fill.breaking { background: var(--red); }
+  .curve-pct { width: 48px; text-align: right; color: var(--muted); }
+  .breaking-tag { color: var(--red); font-size: 12px; margin-left: 8px; }
+
+  ul.recs { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text); }
+  ul.recs li { margin-bottom: 6px; }
+
+  .empty { padding: 24px; color: var(--muted); text-align: center; font-size: 13px; }
+  .close-btn { float: right; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Agent<span>Trust</span> — Behavioral Compliance for Enterprise AI Agent Registries</h1>
+  <p>Performance monitoring exists. Behavioral compliance monitoring does not — AgentTrust fills that gap, built on the BCT framework.</p>
+</header>
+
+<main>
+  <div class="stats" id="stats">
+    <div class="stat"><div class="value">—</div><div class="label">Total Agents</div></div>
+    <div class="stat healthy"><div class="value">—</div><div class="label">Healthy</div></div>
+    <div class="stat warning"><div class="value">—</div><div class="label">Warning</div></div>
+    <div class="stat critical"><div class="value">—</div><div class="label">Critical</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Registered Agents</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Agent Name</th><th>Type</th><th>Performance</th><th>Compliance</th><th>Gap</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="agent-rows"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel detail" id="detail-panel">
+    <h2 id="detail-title">Agent detail <button class="close-btn" onclick="closeDetail()">Close ✕</button></h2>
+    <div class="detail-grid">
+      <div>
+        <div style="color:var(--muted);font-size:12px;text-transform:uppercase;margin-bottom:10px;">Robustness curve (by intensity)</div>
+        <div id="curve"></div>
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:12px;text-transform:uppercase;margin-bottom:10px;">Recommendations</div>
+        <ul class="recs" id="recs"></ul>
+        <div style="color:var(--muted);font-size:12px;text-transform:uppercase;margin:16px 0 10px;">Prompt version history</div>
+        <div id="prompt-versions" style="font-size:13px;"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+async function loadDashboard() {
+  const [metrics, agents] = await Promise.all([
+    fetch('/dashboard/metrics').then(r => r.json()),
+    fetch('/agents').then(r => r.json()),
+  ]);
+  renderStats(metrics);
+  renderAgents(agents);
+}
+
+function renderStats(m) {
+  const el = document.getElementById('stats');
+  el.innerHTML = `
+    <div class="stat"><div class="value">${m.total_agents}</div><div class="label">Total Agents</div></div>
+    <div class="stat healthy"><div class="value">${m.healthy}</div><div class="label">Healthy</div></div>
+    <div class="stat warning"><div class="value">${m.warning}</div><div class="label">Warning</div></div>
+    <div class="stat critical"><div class="value">${m.critical}</div><div class="label">Critical</div></div>
+  `;
+}
+
+function gapClass(gap) {
+  if (gap > 0.20) return 'red';
+  if (gap >= 0.10) return 'orange';
+  return 'green';
+}
+
+function statusBadge(status) {
+  const cls = status === 'CRITICAL' ? 'red' : status === 'WARNING' ? 'orange' : 'green';
+  const label = status === 'CRITICAL' ? '🚨 WATERMELON' : status === 'WARNING' ? '⚠️ WARNING' : '✅ HEALTHY';
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function renderAgents(agents) {
+  const tbody = document.getElementById('agent-rows');
+  if (!agents.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No agents registered yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = agents.map(a => `
+    <tr onclick="openDetail('${a.agent_id}')">
+      <td>${a.agent_name}</td>
+      <td>${a.agent_type}</td>
+      <td>${(a.performance_score * 100).toFixed(1)}%</td>
+      <td>${(a.compliance_score * 100).toFixed(1)}%</td>
+      <td class="gap-${gapClass(a.watermelon_gap)}">${(a.watermelon_gap * 100).toFixed(1)}%</td>
+      <td>${statusBadge(a.status)}</td>
+    </tr>
+  `).join('');
+}
+
+async function openDetail(agentId) {
+  const agent = await fetch(`/agents/${agentId}`).then(r => r.json());
+  document.getElementById('detail-title').innerHTML =
+    `${agent.agent_name} <button class="close-btn" onclick="closeDetail()">Close ✕</button>`;
+
+  const curve = document.getElementById('curve');
+  curve.innerHTML = Object.entries(agent.compliance_by_intensity).map(([lvl, score]) => {
+    const isBreaking = agent.breaking_point && Number(lvl) === agent.breaking_point;
+    return `
+      <div class="curve-row">
+        <div class="lvl">Level ${lvl}</div>
+        <div class="curve-track"><div class="curve-fill ${isBreaking ? 'breaking' : ''}" style="width:${(score * 100).toFixed(0)}%"></div></div>
+        <div class="curve-pct">${(score * 100).toFixed(0)}%</div>
+        ${isBreaking ? '<span class="breaking-tag">← BREAKING POINT</span>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('recs').innerHTML = agent.recommendations.map(r => `<li>${r}</li>`).join('');
+
+  const versions = document.getElementById('prompt-versions');
+  if (!agent.prompt_versions.length) {
+    versions.innerHTML = '<div style="color:var(--muted)">No prompt changes proposed yet.</div>';
+  } else {
+    versions.innerHTML = agent.prompt_versions.map(v => `
+      <div style="margin-bottom:6px;">
+        v${v.version} — ${(v.quality_score * 100).toFixed(1)}%
+        <span class="badge ${v.approved ? 'green' : 'red'}">${v.approved ? 'APPROVED' : 'BLOCKED'}</span>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+loadDashboard();
+</script>
+
+</body>
+</html>

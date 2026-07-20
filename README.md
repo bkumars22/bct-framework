@@ -525,6 +525,54 @@ ZENTRAVIX/ARIA adapters), not itself a BCT test subject — see the
 Projects tab in the dashboard for the full picture, including anything
 not yet connected.
 
+## AgentTrust — behavioral compliance for agent registries
+
+`agent-trust/` extends BCT into a standalone FastAPI service that tests AI
+agents registered in an enterprise agent registry, rather than one project
+at a time. Source: `agent-trust/`.
+
+The problem it targets: performance monitoring already exists for deployed
+agents (latency, cost, token consumption). Behavioral compliance monitoring
+does not — an agent can pass every performance check and still violate its
+own contract the moment it's under adversarial pressure. That mismatch —
+high performance, low compliance — is the **Watermelon Effect**: green
+outside, red inside.
+
+| Metric | Performance monitoring | AgentTrust |
+|---|:---:|:---:|
+| Performance / cost / tokens | ✅ | ✅ |
+| Behavioral compliance | ❌ | ✅ |
+| Breaking point | ❌ | ✅ |
+| Watermelon effect detection | ❌ | ✅ |
+| Prompt governance (AIPQ) | ❌ | ✅ |
+| Multi-agent chain compliance | ❌ | ✅ |
+
+What it adds on top of core BCT:
+
+- **`core/agent_registry.py`** — mock enterprise agent registry (in-memory)
+  tracking each agent's performance_score alongside BCT's compliance_score
+- **`core/compliance_engine.py`** — runs the real BCT adversarial generator
+  (6 categories x 5 intensities) against each registered agent's contract
+  in simulation mode; the module docstring marks exactly where to swap in
+  `bct.verify()` for real-LLM verification
+- **`core/watermelon_detector.py`** — Watermelon Gap (performance minus
+  compliance) and Compliance Gap Score (observed vs. simulated-unobserved
+  compliance), with HEALTHY/WARNING/CRITICAL alerting
+- **`core/prompt_governor.py`** — AIPQ-pattern prompt governance: every
+  proposed system-prompt change is versioned and re-evaluated, then
+  blocked or rolled back if its quality score regresses
+- **`core/chain_tester.py`** — multi-agent chain compliance as the `min()`
+  across the chain, not an average, since one non-compliant agent fails
+  the whole chain
+
+```bash
+cd agent-trust
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+Dashboard: http://localhost:8000/dashboard · API docs: http://localhost:8000/docs
+
 ## Connected To
 
 - AIPQ: blocks deployment if compliance drops
