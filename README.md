@@ -571,7 +571,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-Dashboard: http://localhost:8000/dashboard · API docs: http://localhost:8000/docs
+Then open `http://localhost:8000/dashboard` (API docs at `http://localhost:8000/docs`) — this runs locally only, it is not part of the live Pages demo linked above.
 
 ## Connected To
 

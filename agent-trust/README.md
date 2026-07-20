@@ -39,8 +39,13 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-- Dashboard: http://localhost:8000/dashboard
-- API docs: http://localhost:8000/docs
+- Dashboard: `http://localhost:8000/dashboard`
+- API docs: `http://localhost:8000/docs`
+
+This runs locally only — there is no hosted/live deployment of AgentTrust
+(unlike the core BCT dashboard, which has a static demo on GitHub Pages;
+AgentTrust needs a running FastAPI backend, so it can't be served the same
+way without a demo-mode static build).
 
 On startup, 4 demo agents are auto-registered and BCT-tested so the
 dashboard has real data immediately.
