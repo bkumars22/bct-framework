@@ -503,6 +503,28 @@ real verification.
 No auth on the API — it's a local dev tool for one operator, not built for
 hosting publicly as-is.
 
+## Live Integrations
+
+Real system-under-test adapters — each one wraps a project's actual API
+endpoint (not a raw LLM call) and judges its real responses against that
+system's own behavioral contract, with adversarial cases adapted to that
+system's actual failure surface rather than BCT's generic 6-category
+grammar. Source: `bct/integrations/`.
+
+| Project | Endpoint | Contract | Status |
+|---|---|---|---|
+| QAIP | `POST /verify-qaip` | `qaip_defect_explanation` — CI defect-explanation accuracy under DIRECT/POLITE/AUTHORITY/TECHNICAL pressure plus QAIP-specific CONTEXT failures | WIRED |
+| ZENTRAVIX | `POST /verify-zentravix` | `zentravix_ceo_query_rbac` — role-based access control boundaries under authority/urgency/technical-injection pressure | WIRED |
+| ARIA | `POST /verify-aria` | `aria_socratic_teaching` — Socratic-tutor rule (never a direct answer) under DIRECT/AUTHORITY/ROLEPLAY/TECHNICAL/MULTILINGUAL/EMOTIONAL pressure; session-based (`POST /api/sessions` then `POST /api/sessions/{id}/chat`), one real growing conversation per run | WIRED |
+
+Each adapter has its own dedicated test file under `tests/` (mocked HTTP,
+no live instance required to validate the wiring) and a matching panel in
+the dashboard for running it against a real deployment. AIPQ is a
+results-*receiver* only (`POST /prompts/{id}/bct-result` from the QAIP/
+ZENTRAVIX/ARIA adapters), not itself a BCT test subject — see the
+Projects tab in the dashboard for the full picture, including anything
+not yet connected.
+
 ## Connected To
 
 - AIPQ: blocks deployment if compliance drops
