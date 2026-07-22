@@ -18,6 +18,15 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from dotenv import load_dotenv
+
+# Loads GROQ_API_KEY / ANTHROPIC_API_KEY from a .env file at the repo root
+# into this process's environment (gitignored — never commit real keys
+# there). Explicit path so this works regardless of the working directory
+# uvicorn was launched from; a real env var already set takes precedence
+# over .env (override=False, load_dotenv's default).
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
