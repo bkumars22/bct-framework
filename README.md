@@ -17,7 +17,9 @@ data, clearly labeled). Every push to `main` rebuilds and redeploys it
 automatically, and the full test suite is rerun and published alongside
 it — click **Test Results** in the nav bar for pass/fail per test,
 results by module, and run duration, always current as of the latest
-commit.
+commit. The **AgentTrust** tab shows a captured snapshot of AgentTrust's
+own compliance engine running against its 4 demo agents (same demo-mode
+honesty labeling as the rest of the dashboard) — see below.
 
 (One-time setup: in the repo's Settings → Pages, set Source to the
 `gh-pages` branch — the workflow creates that branch on first run but
@@ -571,7 +573,9 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-Then open `http://localhost:8000/dashboard` (API docs at `http://localhost:8000/docs`) — this runs locally only, it is not part of the live Pages demo linked above.
+Then open `http://localhost:8000/dashboard` (API docs at `http://localhost:8000/docs`) for AgentTrust's own standalone dashboard.
+
+Separately, the main dashboard's **AgentTrust** tab (`dashboard/src/AgentTrust.tsx`) reads live from a locally running AgentTrust instance when you run `dashboard` with `npm run dev` — it tries `http://localhost:8000` (override with `VITE_AGENTTRUST_API_URL`) and falls back to the same captured snapshot the Pages demo uses if nothing answers there, always labeling which one you're looking at (LIVE vs. DEMO DATA).
 
 ## Connected To
 

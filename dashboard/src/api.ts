@@ -7,16 +7,22 @@
  * a real request would produce.
  */
 import {
-  DEMO_ARIA_REPORT, DEMO_DRIFT_REPORT, DEMO_GAP_REPORT, DEMO_PIPELINE_REPORT, DEMO_PROVIDERS, DEMO_QAIP_REPORT,
-  DEMO_SYNTHESIS_RESULT, DEMO_TEMPLATES, DEMO_VERIFICATION_REPORT, DEMO_ZENTRAVIX_REPORT,
+  DEMO_AGENTTRUST_AGENTS, DEMO_AGENTTRUST_METRICS, DEMO_ARIA_REPORT, DEMO_DRIFT_REPORT, DEMO_GAP_REPORT,
+  DEMO_PIPELINE_REPORT, DEMO_PROVIDERS, DEMO_QAIP_REPORT, DEMO_SYNTHESIS_RESULT, DEMO_TEMPLATES,
+  DEMO_VERIFICATION_REPORT, DEMO_ZENTRAVIX_REPORT,
 } from './demoData'
 import type {
-  ARIAVerificationReport, ContractTemplate, DriftAnalysis, GapAnalysisReport, MultiAgentReport, ProvidersInfo,
-  QAIPVerificationReport, SynthesizedContractResult, TestResultsSummary, VerificationReport, ZentravixVerificationReport,
+  ARIAVerificationReport, AgentTrustAgent, AgentTrustDetail, AgentTrustMetrics, ContractTemplate, DriftAnalysis,
+  GapAnalysisReport, MultiAgentReport, ProvidersInfo, QAIPVerificationReport, SynthesizedContractResult,
+  TestResultsSummary, VerificationReport, ZentravixVerificationReport,
 } from './types'
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8010'
 export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+
+// AgentTrust (agent-trust/) is a separate FastAPI process on its own port —
+// not part of api/main.py — so it gets its own base URL and its own env var.
+export const AGENTTRUST_API_URL = import.meta.env.VITE_AGENTTRUST_API_URL || 'http://localhost:8000'
 
 const demoDelay = <T,>(value: T): Promise<T> => new Promise(resolve => setTimeout(() => resolve(value), 400))
 
@@ -155,5 +161,38 @@ export async function fetchTestResults(): Promise<TestResultsSummary> {
   if (!resp.ok) {
     throw new Error(`${resp.status} ${resp.statusText} — test-results.json not found`)
   }
+  return resp.json()
+}
+
+/**
+ * AgentTrust (agent-trust/) is a separate optional local process, not part
+ * of api/main.py — it only responds if the user has `cd agent-trust &&
+ * uvicorn main:app` running. In demo mode this always returns the canned
+ * snapshot in demoData.ts; outside demo mode these throw on failure (same
+ * as checkDrift above) and AgentTrust.tsx decides how to label a fallback
+ * to that same snapshot, rather than silently hiding which one is shown.
+ */
+export async function fetchAgentTrustAgents(): Promise<AgentTrustAgent[]> {
+  if (DEMO_MODE) return demoDelay(DEMO_AGENTTRUST_AGENTS)
+  const resp = await fetch(`${AGENTTRUST_API_URL}/agents`)
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`)
+  return resp.json()
+}
+
+export async function fetchAgentTrustDetail(agentId: string): Promise<AgentTrustDetail> {
+  if (DEMO_MODE) {
+    const found = DEMO_AGENTTRUST_AGENTS.find(a => a.agent_id === agentId)
+    if (!found) throw new Error(`No demo AgentTrust agent with id ${agentId}`)
+    return demoDelay(found)
+  }
+  const resp = await fetch(`${AGENTTRUST_API_URL}/agents/${agentId}`)
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`)
+  return resp.json()
+}
+
+export async function fetchAgentTrustMetrics(): Promise<AgentTrustMetrics> {
+  if (DEMO_MODE) return demoDelay(DEMO_AGENTTRUST_METRICS)
+  const resp = await fetch(`${AGENTTRUST_API_URL}/dashboard/metrics`)
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`)
   return resp.json()
 }

@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
@@ -40,6 +41,18 @@ app = FastAPI(
 
 app.include_router(router)
 app.mount("/dashboard/assets", StaticFiles(directory=DASHBOARD_DIR), name="dashboard-assets")
+
+# Lets the main bct-framework/dashboard React app (run locally on whichever
+# Vite dev port is free) call this API cross-origin for its AgentTrust tab.
+# No auth here either, same as api/main.py — local dev tool, not hardened
+# for public hosting.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://localhost:\d+",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/dashboard")

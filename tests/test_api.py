@@ -215,7 +215,13 @@ class TestVerify:
         assert 0.0 <= proof["violation_rate_upper_bound"] <= 1.0
         assert "NOT" in proof["honesty_notice"]
 
-    def test_verify_without_key_and_without_simulation_returns_400(self):
+    def test_verify_without_key_and_without_simulation_returns_400(self, monkeypatch):
+        # Explicit, not just ambient: api/main.py loads a local .env on
+        # startup (for real GROQ/ANTHROPIC verification), so this test can't
+        # rely on the environment simply not having a key — a developer
+        # with their own .env configured would otherwise fail this test.
+        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         resp = client.post("/verify", json={
             "name": "test_contract", "system": "a test tutor",
             "always": ["ask a question"], "never": ["give the answer"],

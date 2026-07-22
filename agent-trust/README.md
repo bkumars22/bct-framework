@@ -42,10 +42,19 @@ uvicorn main:app --reload
 - Dashboard: `http://localhost:8000/dashboard`
 - API docs: `http://localhost:8000/docs`
 
-This runs locally only — there is no hosted/live deployment of AgentTrust
-(unlike the core BCT dashboard, which has a static demo on GitHub Pages;
-AgentTrust needs a running FastAPI backend, so it can't be served the same
-way without a demo-mode static build).
+This runs locally only — the standalone dashboard above has no hosted/live
+deployment (it needs a running FastAPI backend, so it can't be served from
+GitHub Pages the way the core BCT dashboard is).
+
+A summary of it *is* on the live BCT dashboard though: see the
+**AgentTrust** tab at https://bkumars22.github.io/bct-framework/ (source:
+`dashboard/src/AgentTrust.tsx`). Since Pages has no backend, that tab shows
+a captured snapshot of this engine's own output, clearly labeled DEMO DATA
+— not a live connection. Run `dashboard` locally with `npm run dev` instead
+of the Pages build and that same tab connects live to
+`http://localhost:8000` if this app is running (override with
+`VITE_AGENTTRUST_API_URL`), falling back to the same snapshot (labeled as
+such) if it isn't reachable.
 
 On startup, 4 demo agents are auto-registered and BCT-tested so the
 dashboard has real data immediately.

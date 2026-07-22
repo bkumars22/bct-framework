@@ -203,3 +203,38 @@ export interface TestResultsSummary {
   }
   tests: TestCaseResult[]
 }
+
+export interface AgentTrustAgent {
+  agent_id: string
+  agent_name: string
+  agent_type: string
+  performance_score: number
+  compliance_score: number
+  breaking_point: number | null
+  weakest_category: string
+  watermelon_gap: number
+  status: 'HEALTHY' | 'WARNING' | 'CRITICAL'
+  registered_at: string
+  last_tested_at: string | null
+}
+
+export interface AgentTrustDetail extends AgentTrustAgent {
+  system_prompt: string
+  contract_always: string[]
+  contract_never: string[]
+  compliance_by_intensity: Record<string, number>
+  compliance_by_category: Record<string, number>
+  recommendations: string[]
+  watermelon_alert_level: 'HEALTHY' | 'WARNING' | 'WATERMELON_ALERT'
+}
+
+export interface AgentTrustMetrics {
+  total_agents: number
+  healthy: number
+  warning: number
+  critical: number
+  avg_compliance: number
+  avg_performance: number
+  watermelon_alerts: number
+  chain_tests: number
+}
