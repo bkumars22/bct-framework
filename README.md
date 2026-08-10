@@ -1,6 +1,6 @@
 # BCT — Behavioral Contract Testing Framework
 
-![Tests](https://img.shields.io/badge/tests-142%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-167%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Levels](https://img.shields.io/badge/BCT%20levels-10-purple)
@@ -80,7 +80,7 @@ Integration: FastAPI backend + React dashboard + GitHub Actions
 | 9 | `synthesizer.py` | Synthesizes contracts from examples | 8 |
 | 10 | `statistical_proof.py` | Honest Clopper-Pearson bounds | 12 |
 
-**122 tests total (including base contract/generator/verifier/API tests), all passing, all wired to the FastAPI backend and verified in a real browser.**
+**167 tests total (including base contract/generator/verifier/API tests), all passing, all wired to the FastAPI backend and verified in a real browser.** (`agent-trust/` has its own separate test run — see `pytest.ini`'s `norecursedirs`.)
 
 ## The 6 Adversarial Categories
 
