@@ -6,11 +6,12 @@ import tailwindcss from '@tailwindcss/vite'
 // live backend (hence demo mode); local/Docker builds serve from root
 // against a real backend. Only the explicit `--mode ghpages` build (used
 // by the Pages workflow) gets the subpath base.
-export default defineConfig(({ mode }) => ({
+
+export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: '/',
   server: {
     port: 3002,
-    host: '0.0.0.0', // bind both IPv4 and IPv6 — default (bare "localhost") only bound IPv6 here
+    host: '0.0.0.0',
   },
-}))
+})
